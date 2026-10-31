@@ -1,0 +1,23 @@
+{
+  "display": {
+    "icon": {
+      "id": "sporesrp:world_purification_core"
+    },
+    "title": {
+      "translate": "sporesrp.advancement.root.title"
+    },
+    "description": {
+      "translate": "sporesrp.advancement.root.description"
+    },
+    "background": "spore:textures/block/biomass.png",
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "requirement": {
+      "trigger": "minecraft:tick"
+    }
+  }
+}

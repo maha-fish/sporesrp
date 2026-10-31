@@ -1,0 +1,14 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": [
+    { "item": "sporesrp:decoy_1" },
+    { "item": "spore:mutated_fiber" },
+    { "item": "spore:mutated_fiber" },
+    { "item": "spore:tumor" }
+  ],
+  "result": {
+    "id": "sporesrp:decoy_2",
+    "count": 1
+  }
+}
