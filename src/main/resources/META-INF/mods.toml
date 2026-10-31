@@ -1,0 +1,35 @@
+modLoader="javafml"
+loaderVersion="[47,)"      # Forge 47+ (1.20.1)
+license="All rights reserved"
+
+[[mods]]
+modId="sporesrp"
+version="1.9.0"
+displayName="Spore:SRP!"
+logoFile="sporesrp_logo.png"
+authors="maha_fish"
+description='''
+Spore:SRP!
+This mod introduces several new mechanics to Fungal Infection: Spore,drawing inspiration from SRP while also featuring original designs,all aimed at ramping up the survival challenge.
+'''
+
+[[dependencies.sporesrp]]
+modId="forge"
+mandatory=true
+versionRange="[47,)"
+ordering="NONE"
+side="BOTH"
+
+[[dependencies.sporesrp]]
+modId="minecraft"
+mandatory=true
+versionRange="[1.20.1,1.21)"
+ordering="NONE"
+side="BOTH"
+
+[[dependencies.sporesrp]]
+modId="spore"
+mandatory=true
+versionRange="[1.0,)"
+ordering="AFTER"
+side="BOTH"

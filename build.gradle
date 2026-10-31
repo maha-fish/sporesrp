@@ -1,0 +1,104 @@
+plugins {
+    id 'eclipse'
+    id 'idea'
+    id 'maven-publish'
+    id 'net.minecraftforge.gradle' version '[6.0,6.2)'
+}
+
+version = '1.9.0'
+group = 'com.maha_fish.sporesrp'
+base {
+    archivesName = 'sporesrp'
+}
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(17)
+
+println "Java: ${System.getProperty 'java.version'}, JVM: ${System.getProperty 'java.vm.version'} (${System.getProperty 'java.vendor'}), Arch: ${System.getProperty 'os.arch'}"
+
+minecraft {
+    mappings channel: 'official', version: '1.20.1'
+    copyIdeResources = true
+    runs {
+        configureEach {
+            workingDirectory project.file('run')
+            property 'forge.logging.markers', 'REGISTRIES'
+            property 'forge.logging.console.level', 'debug'
+            mods {
+                sporesrp {
+                    source sourceSets.main
+                }
+            }
+        }
+        client {
+            property 'forge.enabledGameTestNamespaces', 'sporesrp'
+        }
+        server {
+            property 'forge.enabledGameTestNamespaces', 'sporesrp'
+            args '--nogui'
+        }
+        gameTestServer {
+            property 'forge.enabledGameTestNamespaces', 'sporesrp'
+        }
+        data {
+            workingDirectory project.file('run-data')
+            args '--mod', 'sporesrp', '--all', '--output', file('src/generated/resources/'), '--existing', file('src/main/resources/')
+        }
+    }
+}
+
+sourceSets.main.resources { srcDir 'src/generated/resources' }
+
+repositories {
+    maven { url 'https://maven.aliyun.com/repository/public/' }
+    maven { url 'https://maven.aliyun.com/repository/central' }
+    maven { url 'https://lss233.littleservice.cn/repositories/minecraft/' }
+    mavenCentral()
+    // 如果想直接依赖 spore 模组的 jar 文件，可以取消注释并将 spore_xxx.jar 放入 libs 文件夹
+    // flatDir { dir 'libs' }
+
+}
+
+dependencies {
+    minecraft 'net.minecraftforge:forge:1.20.1-47.4.10'
+
+    // 如需本地依赖，取消注释并指定 jar 文件名
+    // implementation fg.deobf("flat:spore:2.2.0h")
+}
+
+tasks.named('processResources', ProcessResources).configure {
+    // 不再使用变量替换，直接保留原样（因为我们已经固定了所有值）
+    filesMatching(['META-INF/mods.toml', 'pack.mcmeta']) {
+        // 留空表示不做替换
+    }
+}
+
+tasks.named('jar', Jar).configure {
+    manifest {
+        attributes([
+                'Specification-Title'     : 'sporesrp',
+                'Specification-Vendor'    : 'maha_fish',
+                'Specification-Version'   : '1',
+                'Implementation-Title'    : project.name,
+                'Implementation-Version'  : project.jar.archiveVersion,
+                'Implementation-Vendor'   : 'maha_fish',
+                'Implementation-Timestamp': new Date().format("yyyy-MM-dd'T'HH:mm:ssZ")
+        ])
+    }
+    finalizedBy 'reobfJar'
+}
+
+publishing {
+    publications {
+        register('mavenJava', MavenPublication) {
+            artifact jar
+        }
+    }
+    repositories {
+        maven {
+            url "file://${project.projectDir}/mcmodsrepo"
+        }
+    }
+}
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
