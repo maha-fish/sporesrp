@@ -1,155 +1,173 @@
 # Spore:SRP!
 
-面向 **Spore（真菌感染：孢子）** 的附属 Mod，同时维护 Forge 与 NeoForge 两个平台。
+Spore 附属 Mod 的源码仓库，Forge 与 NeoForge 各占一个分支。
 
-| 平台 | 版本 | 源码分支 |
-|---|---|---|
-| Forge | 1.20.1（47.x） | [`forge-1.20.1`](https://github.com/maha-fish/sporesrp/tree/forge-1.20.1) |
-| NeoForge | 1.21.1（21.x） | [`neo-1.21.1`](https://github.com/maha-fish/sporesrp/tree/neo-1.21.1) |
+| 平台 | 版本 | 分支 | JDK |
+|---|---|---|---|
+| Forge | 1.20.1（47.x） | [`forge-1.20.1`](https://github.com/maha-fish/sporesrp/tree/forge-1.20.1) | 17 |
+| NeoForge | 1.21.1（21.x） | [`neo-1.21.1`](https://github.com/maha-fish/sporesrp/tree/neo-1.21.1) | 21 |
 
-当前版本 **1.9.0**。两个分支各自独立、可单独克隆构建。
-
-> 本 Mod **不包含**任何 Spore 的编译期依赖 —— 它完全通过注册名字符串（`spore:proto`、`spore:mound`、`spore:scent` …）与配置里的名称池来识别 Spore 内容，因此 Spore 缺失时会安静降级而不是崩溃。
+`main` 分支只放本 README 与 `.gitignore`，不含源码。
 
 ---
 
 ## 中文
 
-### 这个 Mod 做什么
+### 环境要求
 
-Spore 本体提供了寄生体、菌囊、演化阶段这套框架，但**演化阶段的压迫感是断的**：阶段除了换更强的怪，几乎不影响世界本身。本 Mod 补上这一环，并修正若干原版实现里的性能与逻辑问题。
-
-### 主要特性
-
-**演化系统**
-- 演化点数 / 阶段 / 难度三层结构，全域共享一份数据
-- 升阶会延长演化时间冷却，冷却期间无法获得点数；冷却只增不减，且按加法累加
-- 降阶不额外收取冷却，代价仅来自诱饵本身
-
-**阶段门控 —— 世界越晚越不宜生存**
-
-| 阶段 | 效果 |
-|---|---|
-| 6+ | 作物生长受阻（7 阶段 30%、8 阶段 60%、9 阶段起 100%）、无法钓鱼 |
-| 8+ | 孢子生物死亡不掉落经验 |
-| 9+ | 非孢子生物自然回血减半 |
-
-所有阈值与概率都在配置里，可单独关闭或调整曲线。
-
-**诱饵与饵堆**
-
-沿用 SRP（V1.9.13 之后）的数值与规则：
-
-- **单个诱饵** —— 只叠加演化时间冷却，不扣点数
-- **饵堆** —— 同一水平面 5×5 正方形的四个角各放一块**同等级**诱饵后右键中心，按中心等级扣演化点数，并吸引周围真菌生物的仇恨；若世界存在 Proto，必定有一只被强制注意到你
-
-8 个等级各有独立物品（`sporesrp:decoy_1` … `decoy_8`）、独立贴图与独立配方。
-
-**净化世界**
-
-净化成功后一次性清扫该维度全部孢子生物，之后用每维度缓存的布尔值做闸门，并在刷怪入口拦截 —— 不再对每只入场实体读取存档数据。
-
-**感染群系刷怪调优**
-
-重写 `sporesrp:infected_biome` 的刷怪配置：`maxCount` 全部改为 1，并大幅收紧 `spawn_costs` 的充能速率，让原版自带的「每区块配额」真正开始限流。
-
-**配置热更新**
-
-不靠改写 Spore 的配置文件。启动完成后直接把目标值写进 Spore 已加载的 Config 对象的内存 spec，立即生效，再序列化回文件。
-
-### 安装
-
-1. 安装对应平台的 Spore（必需）
-2. 把 `sporesrp-1.9.0.jar`（1.20.1）或 `sporesrp-1.9.0-neo.jar`（1.21.1）放进 `mods/`
-3. 启动游戏
+- 两个分支都需要 JDK（Forge 17 / NeoForge 21），由 Gradle toolchain 校验
+- 平台 SDK 由构建插件自动拉取，无需手动安装
+- Gradle Wrapper 已随仓库提供，无需本地 Gradle
 
 ### 构建
 
-对应分支内直接运行：
-
 ```bash
-./gradlew build        # Windows: gradlew.bat build
+git clone -b forge-1.20.1 https://github.com/maha-fish/sporesrp.git
+cd sporesrp
+./gradlew build          # Windows: gradlew.bat build
 ```
 
-产物在 `build/libs/` 下。Forge 分支需要 JDK 17，NeoForge 分支需要 JDK 21。
+产物在 `build/libs/`。常用任务：
 
-### 说明
+| 任务 | 作用 |
+|---|---|
+| `build` | 编译并打包 |
+| `runClient` / `runServer` | 启动开发环境客户端 / 服务端 |
+| `runData` | 数据生成（如分支内配置了 datagen） |
 
-贴图为本项目自行生成的原创素材。
+### 设计约束
+
+**没有编译期 Spore 依赖。** 与 Spore 的一切交互都走两条路：
+
+1. 注册名字符串比对（`spore:proto`、`spore:mound`、`spore:scent` …），封在 `util/SporeEntityHelper`
+2. 反射读取 Spore 的公开方法（`Mound#getAge`、`Mound#getLinked`）与配置字段，封在 `util/SporeBridge`，全部失败降级
+
+因此 Spore 缺失时 Mod 不会崩，只是相关功能不生效。新增对 Spore 的依赖时请保持这个约定。
+
+### 代码结构
+
+| 包 / 类 | 职责 |
+|---|---|
+| `data/WorldEvolutionData` | 演化状态（SavedData）。点数、阶段、冷却的**唯一**写入者 |
+| `phase/PhaseEffects` | 阶段变化的副作用（播报、属性刷新、事件派发） |
+| `handler/*` | 各类事件处理器（刷怪、转化、支援、净化、阶段门控…） |
+| `block/`、`item/` | 诱饵方块与物品、创造栏 |
+| `config/SporeConfigBridge` | 启动后把配置写进 Spore 的内存 spec 并回写文件 |
+| `network/` | 客户端同步包与 HUD 数据持有者 |
+| `util/SporeEntityHelper` | 实体判定与生物池，带注册名缓存 |
+| `util/SporeEntityCache` | 按维度分组的存活实体索引，每 tick 刷新 |
+| `util/SporeBridge` | 反射读取 Spore 内部状态，失败降级 |
+| `util/EntityRemoval` | 直写 `removalReason` + 手动发移除包 |
+| `client/HUDOverlay` | 演化信息 HUD，本地按 tick 倒数 |
+
+### 两条硬性约定
+
+**① 冷却只能增减，不能绝对设置。**
+
+`WorldEvolutionData.adjustPointCooldown(tick, seconds)` 是唯一入口：`seconds > 0` 累加，`< 0` 扣减，结果不会早于当前 tick。不要新增 `setXxxCooldown`。降阶本身不改冷却。
+
+**② 所有写操作自动同步。**
+
+`setDirty()` 被覆写为「标记待同步」，由 `SporeEntityCache` 的 tick 钩子每 tick 统一 flush 一次。新增改动状态的方法只要照常调 `setDirty()`，不必在调用点手动发同步包。
+
+### 两端 API 差异备忘
+
+迁移代码时基本都会撞上这几处：
+
+| 场景 | Forge 1.20.1 | NeoForge 1.21.1 |
+|---|---|---|
+| 方块右键 | `Block#use(…, InteractionHand, …)` | 拆成 `useItemOn` / `useWithoutItem` |
+| 带方块实体的方块 | 无需实现 | 必须实现 `codec()` |
+| 物品附加数据 | `ItemStack` 的 NBT | `DataComponents` |
+| 配方目录 | `data/<ns>/recipes/` | `data/<ns>/recipe/` |
+| 配方结果键 | `"item"` | `"id"` |
+| 作物生长事件 | `BlockEvent.CropGrowEvent.Pre` | `event.level.block.CropGrowEvent.Pre` |
+| 作物取消方式 | `Event.Result.DENY` | `CropGrowEvent.Pre.Result.DO_NOT_GROW` |
+| 刷怪终局事件 | `MobSpawnEvent.FinalizeSpawn`（嵌套） | `FinalizeSpawnEvent`（顶层） |
+| 生产环境反射字段名 | SRG，须用 `ObfuscationReflectionHelper` | 官方映射，可直接 `getDeclaredField` |
 
 ---
 
 ## English
 
-An addon for **Spore (Fungal Infection: Spore)**, maintained for both Forge and NeoForge.
+Source repository for a Spore addon, one branch per mod loader.
 
-| Platform | Version | Source branch |
-|---|---|---|
-| Forge | 1.20.1 (47.x) | [`forge-1.20.1`](https://github.com/maha-fish/sporesrp/tree/forge-1.20.1) |
-| NeoForge | 1.21.1 (21.x) | [`neo-1.21.1`](https://github.com/maha-fish/sporesrp/tree/neo-1.21.1) |
+| Platform | Version | Branch | JDK |
+|---|---|---|---|
+| Forge | 1.20.1 (47.x) | [`forge-1.20.1`](https://github.com/maha-fish/sporesrp/tree/forge-1.20.1) | 17 |
+| NeoForge | 1.21.1 (21.x) | [`neo-1.21.1`](https://github.com/maha-fish/sporesrp/tree/neo-1.21.1) | 21 |
 
-Current version: **1.9.0**. Each branch is standalone and can be cloned and built on its own.
+The `main` branch holds only this README and `.gitignore`; it contains no source code.
 
-> There is **no compile-time dependency** on Spore. Content is identified purely by registry id strings (`spore:proto`, `spore:mound`, `spore:scent`, …) plus config-driven name pools, so the mod degrades quietly instead of crashing when Spore is absent.
+### Requirements
 
-### What it does
-
-Spore gives you parasites, mounds and evolution phases — but the pressure of an evolving world stops at "stronger mobs spawn". This mod closes that gap and fixes a number of performance and logic issues along the way.
-
-### Features
-
-**Evolution system**
-- Points / phase / difficulty, stored once per world
-- Advancing a phase extends the evolution-time cooldown, during which no points can be gained; the cooldown is additive and never reset
-- Dropping a phase costs no extra cooldown — only the decoy's own
-
-**Phase gating — the world gets less survivable as it evolves**
-
-| Phase | Effect |
-|---|---|
-| 6+ | Crops stall (30% at phase 7, 60% at 8, 100% from 9), fishing disabled |
-| 8+ | Spore mobs stop dropping experience |
-| 9+ | Non-spore mobs heal at half rate |
-
-Every threshold and probability is configurable and can be disabled individually.
-
-**Decoy and decoy pile**
-
-Follows Spore's post-V1.9.13 numbers:
-
-- **Single decoy** — extends the evolution-time cooldown only, no point reduction
-- **Pile** — place a same-tier decoy on each corner of a 5×5 square (same Y level) and right-click the centre. Points are reduced according to the **centre** decoy's tier, nearby fungal creatures are taunted onto you, and if any Proto exists in the world, one of them is guaranteed to notice you.
-
-Eight tiers, each a separate item (`sporesrp:decoy_1` … `decoy_8`) with its own texture and recipe.
-
-**World purification**
-
-On success, every spore entity in the dimension is swept once; afterwards a per-dimension cached flag gates spawns at the spawn hook — no more reading saved data for every entity that joins.
-
-**Infected biome spawn tuning**
-
-The spawn list was rewritten so every entry has `maxCount` 1 and `spawn_costs` recharge rates are cut by an order of magnitude, which is what actually makes vanilla's per-chunk budget bite.
-
-**Hot config reload**
-
-No more rewriting Spore's config files. After startup, target values are written straight into Spore's already-loaded in-memory config specs, taking effect immediately and then being serialised back to disk.
-
-### Installation
-
-1. Install Spore for your platform (required)
-2. Drop `sporesrp-1.9.0.jar` (1.20.1) or `sporesrp-1.9.0-neo.jar` (1.21.1) into `mods/`
-3. Launch
+- A JDK matching the branch (17 for Forge, 21 for NeoForge); enforced by the Gradle toolchain
+- Platform SDKs are fetched by the build plugin — nothing to install manually
+- The Gradle wrapper is committed, so no local Gradle is needed
 
 ### Building
 
-Inside the corresponding branch:
-
 ```bash
-./gradlew build        # Windows: gradlew.bat build
+git clone -b forge-1.20.1 https://github.com/maha-fish/sporesrp.git
+cd sporesrp
+./gradlew build          # Windows: gradlew.bat build
 ```
 
-Outputs land in `build/libs/`. The Forge branch needs JDK 17, the NeoForge branch needs JDK 21.
+Outputs land in `build/libs/`. Common tasks:
 
-### Notes
+| Task | Purpose |
+|---|---|
+| `build` | Compile and package |
+| `runClient` / `runServer` | Launch a dev client / server |
+| `runData` | Data generation (where configured) |
 
-All textures are original assets generated for this project.
+### Design constraint
+
+**There is no compile-time dependency on Spore.** Every interaction goes through one of two paths:
+
+1. Registry id string comparison (`spore:proto`, `spore:mound`, `spore:scent`, …), contained in `util/SporeEntityHelper`
+2. Reflection over Spore's public methods (`Mound#getAge`, `Mound#getLinked`) and config fields, contained in `util/SporeBridge`, with degraded behaviour on failure
+
+As a result the mod does not crash when Spore is absent; the related features simply do nothing. Keep this contract when adding new Spore interactions.
+
+### Code layout
+
+| Package / class | Responsibility |
+|---|---|
+| `data/WorldEvolutionData` | Evolution state (SavedData). The **only** writer of points, phase and cooldown |
+| `phase/PhaseEffects` | Side effects of a phase change (broadcast, attribute refresh, event dispatch) |
+| `handler/*` | Event handlers (spawning, conversion, support, purification, phase gating, …) |
+| `block/`, `item/` | Decoy block and items, creative tab |
+| `config/SporeConfigBridge` | Writes config into Spore's in-memory specs after startup, then flushes to disk |
+| `network/` | Client sync packet and HUD data holder |
+| `util/SporeEntityHelper` | Entity checks and spawn pools, with registry-id caching |
+| `util/SporeEntityCache` | Per-dimension index of living entities, refreshed each tick |
+| `util/SporeBridge` | Reflective reads of Spore internals, degrades on failure |
+| `util/EntityRemoval` | Writes `removalReason` directly plus sends the removal packet |
+| `client/HUDOverlay` | Evolution HUD, counts down locally per tick |
+
+### Two hard rules
+
+**① Cooldown can only be added or subtracted, never set absolutely.**
+
+`WorldEvolutionData.adjustPointCooldown(tick, seconds)` is the single entry point: positive adds, negative subtracts, and the result never lands before the current tick. Do not introduce `setXxxCooldown`. Dropping a phase does not touch the cooldown.
+
+**② Every write syncs itself.**
+
+`setDirty()` is overridden to mark the state dirty, and `SporeEntityCache`'s tick hook flushes it once per tick. Any new mutator only needs to call `setDirty()`; call sites never send sync packets manually.
+
+### Platform API notes
+
+These are the differences you will hit when porting code:
+
+| Case | Forge 1.20.1 | NeoForge 1.21.1 |
+|---|---|---|
+| Block right-click | `Block#use(…, InteractionHand, …)` | split into `useItemOn` / `useWithoutItem` |
+| Block with a block entity | not required | `codec()` must be implemented |
+| Item-attached data | `ItemStack` NBT | `DataComponents` |
+| Recipe directory | `data/<ns>/recipes/` | `data/<ns>/recipe/` |
+| Recipe result key | `"item"` | `"id"` |
+| Crop growth event | `BlockEvent.CropGrowEvent.Pre` | `event.level.block.CropGrowEvent.Pre` |
+| Cancelling crop growth | `Event.Result.DENY` | `CropGrowEvent.Pre.Result.DO_NOT_GROW` |
+| Spawn finalisation | `MobSpawnEvent.FinalizeSpawn` (nested) | `FinalizeSpawnEvent` (top level) |
+| Reflection on production field names | SRG — use `ObfuscationReflectionHelper` | official mappings — plain `getDeclaredField` |
