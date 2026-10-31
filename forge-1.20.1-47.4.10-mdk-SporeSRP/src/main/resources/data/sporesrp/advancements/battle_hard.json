@@ -1,5 +1,0 @@
-{
-  "display": {"icon": {"item": "minecraft:netherite_ingot"}, "title": {"translate": "sporesrp.advancement.battle_hard.title"}, "description": {"translate": "sporesrp.advancement.battle_hard.description"}, "frame": "challenge", "show_toast": true, "announce_to_chat": true, "hidden": false},
-  "parent": "sporesrp:battle_start",
-  "criteria": {"requirement": {"trigger": "minecraft:impossible"}}
-}

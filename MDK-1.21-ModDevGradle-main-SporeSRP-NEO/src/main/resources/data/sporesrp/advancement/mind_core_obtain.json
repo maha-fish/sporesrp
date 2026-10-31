@@ -1,5 +1,0 @@
-{
-  "display": {"icon": {"id": "sporesrp:mind_core"}, "title": {"translate": "sporesrp.advancement.mind_core_obtain.title"}, "description": {"translate": "sporesrp.advancement.mind_core_obtain.description"}, "frame": "goal", "show_toast": true, "announce_to_chat": true, "hidden": false},
-  "parent": "sporesrp:hivemind_kill",
-  "criteria": {"requirement": {"trigger": "minecraft:impossible"}}
-}

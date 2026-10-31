@@ -1,5 +1,0 @@
-{
-  "display": {"icon": {"item": "spore:knight_spawnegg"}, "title": {"translate": "sporesrp.advancement.kill_medium_10.title"}, "description": {"translate": "sporesrp.advancement.kill_medium_10.description"}, "frame": "goal", "show_toast": true, "announce_to_chat": true, "hidden": false},
-  "parent": "sporesrp:kill_medium",
-  "criteria": {"requirement": {"trigger": "minecraft:impossible"}}
-}

@@ -1,5 +1,0 @@
-{
-  "display": {"icon": {"item": "spore:infected_human_spawnegg"}, "title": {"translate": "sporesrp.advancement.kill_small_10.title"}, "description": {"translate": "sporesrp.advancement.kill_small_10.description"}, "frame": "goal", "show_toast": true, "announce_to_chat": true, "hidden": false},
-  "parent": "sporesrp:kill_small",
-  "criteria": {"requirement": {"trigger": "minecraft:impossible"}}
-}

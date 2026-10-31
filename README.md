@@ -1,13 +1,13 @@
 # Spore:SRP!
 
-面向 **Spore（真菌感染：孢子）** 的附属 Mod，双端同步维护：
+面向 **Spore（真菌感染：孢子）** 的附属 Mod，同时维护 Forge 与 NeoForge 两个平台。
 
-| 平台 | 版本 | 构建 |
+| 平台 | 版本 | 源码分支 |
 |---|---|---|
-| Forge | 1.20.1（47.x） | ForgeGradle 6 / JDK 17 |
-| NeoForge | 1.21.1（21.x） | ModDevGradle 2 / JDK 21 |
+| Forge | 1.20.1（47.x） | [`forge-1.20.1`](https://github.com/maha-fish/sporesrp/tree/forge-1.20.1) |
+| NeoForge | 1.21.1（21.x） | [`neo-1.21.1`](https://github.com/maha-fish/sporesrp/tree/neo-1.21.1) |
 
-当前版本 **1.9.0**。
+当前版本 **1.9.0**。两个分支各自独立、可单独克隆构建。
 
 > 本 Mod **不包含**任何 Spore 的编译期依赖 —— 它完全通过注册名字符串（`spore:proto`、`spore:mound`、`spore:scent` …）与配置里的名称池来识别 Spore 内容，因此 Spore 缺失时会安静降级而不是崩溃。
 
@@ -23,7 +23,8 @@ Spore 本体提供了寄生体、菌囊、演化阶段这套框架，但**演化
 
 **演化系统**
 - 演化点数 / 阶段 / 难度三层结构，全域共享一份数据
-- 阶段提升与下降都会推进冷却，冷却期间无法获得点数（加法累加，不清零）
+- 升阶会延长演化时间冷却，冷却期间无法获得点数；冷却只增不减，且按加法累加
+- 降阶不额外收取冷却，代价仅来自诱饵本身
 
 **阶段门控 —— 世界越晚越不宜生存**
 
@@ -54,7 +55,7 @@ Spore 本体提供了寄生体、菌囊、演化阶段这套框架，但**演化
 
 **配置热更新**
 
-不再靠改写 Spore 的配置文件。启动完成后直接把目标值写进 Spore 已加载的 Config 对象的内存 spec，立即生效，再序列化回文件。玩家手改会被纠正，重复开世界不写盘。
+不靠改写 Spore 的配置文件。启动完成后直接把目标值写进 Spore 已加载的 Config 对象的内存 spec，立即生效，再序列化回文件。
 
 ### 安装
 
@@ -64,60 +65,30 @@ Spore 本体提供了寄生体、菌囊、演化阶段这套框架，但**演化
 
 ### 构建
 
-```bash
-# Forge 1.20.1（JDK 17）
-cd forge-1.20.1-47.4.10-mdk-SporeSRP
-gradlew build
+对应分支内直接运行：
 
-# NeoForge 1.21.1（JDK 21）
-cd MDK-1.21-ModDevGradle-main-SporeSRP-NEO
-gradlew build
+```bash
+./gradlew build        # Windows: gradlew.bat build
 ```
 
-产物在各自 `build/libs/` 下。
-
-### 指令
-
-需要权限等级 2。
-
-| 指令 | 作用 |
-|---|---|
-| `/sporesrp info` | 查看当前点数、阶段、冷却、难度 |
-| `/sporesrp addpoints <数量>` | 增加演化点数 |
-| `/sporesrp setpoints <数量>` | 设置演化点数 |
-| `/sporesrp setphase <阶段>` | 强制设置阶段 |
-| `/sporesrp addcooldown <秒数>` | 调整点数冷却（正数加、负数减） |
-| `/sporesrp difficulty` | 查看/设置难度 |
-| `/sporesrp mound info` | 菌囊信息 |
-| `/sporesrp hud` | HUD 开关 |
-| `/sporesrp cache` | 缓存状态 |
-| `/sporesrp battle start\|end` | 净化之战 |
-
-### 文档
-
-| 文件 | 内容 |
-|---|---|
-| [`改动总汇.md`](改动总汇.md) | 全部改动清单 |
-| [`机制与修复清单.md`](机制与修复清单.md) | 问题定位与依据 |
-| [`审计与优化报告.md`](审计与优化报告.md) | 性能审计 |
-| [`开工方案.md`](开工方案.md) | 分阶段实施方案与进度 |
+产物在 `build/libs/` 下。Forge 分支需要 JDK 17，NeoForge 分支需要 JDK 21。
 
 ### 说明
 
-本仓库**不包含**从 Spore / Forge / NeoForge 反编译得到的源码（`_spore_probe`、`_forge_src`、`_neo_src`、`_ref` 均在 `.gitignore` 中）。贴图为本项目自行生成的原创素材。
+贴图为本项目自行生成的原创素材。
 
 ---
 
 ## English
 
-An addon for **Spore (Fungal Infection: Spore)**, maintained on two platforms at once:
+An addon for **Spore (Fungal Infection: Spore)**, maintained for both Forge and NeoForge.
 
-| Platform | Version | Build |
+| Platform | Version | Source branch |
 |---|---|---|
-| Forge | 1.20.1 (47.x) | ForgeGradle 6 / JDK 17 |
-| NeoForge | 1.21.1 (21.x) | ModDevGradle 2 / JDK 21 |
+| Forge | 1.20.1 (47.x) | [`forge-1.20.1`](https://github.com/maha-fish/sporesrp/tree/forge-1.20.1) |
+| NeoForge | 1.21.1 (21.x) | [`neo-1.21.1`](https://github.com/maha-fish/sporesrp/tree/neo-1.21.1) |
 
-Current version: **1.9.0**.
+Current version: **1.9.0**. Each branch is standalone and can be cloned and built on its own.
 
 > There is **no compile-time dependency** on Spore. Content is identified purely by registry id strings (`spore:proto`, `spore:mound`, `spore:scent`, …) plus config-driven name pools, so the mod degrades quietly instead of crashing when Spore is absent.
 
@@ -129,7 +100,8 @@ Spore gives you parasites, mounds and evolution phases — but the pressure of a
 
 **Evolution system**
 - Points / phase / difficulty, stored once per world
-- Both phase up and phase **down** extend the cooldown; no point gain while it lasts (additive, never reset to zero)
+- Advancing a phase extends the evolution-time cooldown, during which no points can be gained; the cooldown is additive and never reset
+- Dropping a phase costs no extra cooldown — only the decoy's own
 
 **Phase gating — the world gets less survivable as it evolves**
 
@@ -160,7 +132,7 @@ The spawn list was rewritten so every entry has `maxCount` 1 and `spawn_costs` r
 
 **Hot config reload**
 
-No more rewriting Spore's config files. After startup, target values are written straight into Spore's already-loaded in-memory config specs, taking effect immediately and then being serialised back to disk. Manual edits get corrected; repeated world loads don't write.
+No more rewriting Spore's config files. After startup, target values are written straight into Spore's already-loaded in-memory config specs, taking effect immediately and then being serialised back to disk.
 
 ### Installation
 
@@ -170,46 +142,14 @@ No more rewriting Spore's config files. After startup, target values are written
 
 ### Building
 
-```bash
-# Forge 1.20.1 (JDK 17)
-cd forge-1.20.1-47.4.10-mdk-SporeSRP
-gradlew build
+Inside the corresponding branch:
 
-# NeoForge 1.21.1 (JDK 21)
-cd MDK-1.21-ModDevGradle-main-SporeSRP-NEO
-gradlew build
+```bash
+./gradlew build        # Windows: gradlew.bat build
 ```
 
-Outputs land in each project's `build/libs/`.
-
-### Commands
-
-Permission level 2 required.
-
-| Command | Purpose |
-|---|---|
-| `/sporesrp info` | Points, phase, cooldown, difficulty |
-| `/sporesrp addpoints <n>` | Add evolution points |
-| `/sporesrp setpoints <n>` | Set evolution points |
-| `/sporesrp setphase <n>` | Force a phase |
-| `/sporesrp addcooldown <s>` | Adjust point cooldown (positive adds, negative subtracts) |
-| `/sporesrp difficulty` | View / set difficulty |
-| `/sporesrp mound info` | Mound info |
-| `/sporesrp hud` | Toggle HUD |
-| `/sporesrp cache` | Cache status |
-| `/sporesrp battle start\|end` | Purification battle |
-
-### Documents
-
-All design notes are in Chinese:
-
-| File | Contents |
-|---|---|
-| [`改动总汇.md`](改动总汇.md) | Full changelog |
-| [`机制与修复清单.md`](机制与修复清单.md) | Issue list with evidence |
-| [`审计与优化报告.md`](审计与优化报告.md) | Performance audit |
-| [`开工方案.md`](开工方案.md) | Phased plan and progress |
+Outputs land in `build/libs/`. The Forge branch needs JDK 17, the NeoForge branch needs JDK 21.
 
 ### Notes
 
-This repository does **not** contain any code decompiled from Spore, Forge or NeoForge (`_spore_probe`, `_forge_src`, `_neo_src`, `_ref` are all git-ignored). All textures are original assets generated for this project.
+All textures are original assets generated for this project.

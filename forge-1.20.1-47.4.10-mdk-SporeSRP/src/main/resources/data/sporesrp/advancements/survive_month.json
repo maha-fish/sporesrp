@@ -1,5 +1,0 @@
-{
-  "display": {"icon": {"item": "minecraft:clock"}, "title": {"translate": "sporesrp.advancement.survive_month.title"}, "description": {"translate": "sporesrp.advancement.survive_month.description"}, "frame": "challenge", "show_toast": true, "announce_to_chat": true, "hidden": false},
-  "parent": "sporesrp:survive_week",
-  "criteria": {"requirement": {"trigger": "minecraft:impossible"}}
-}

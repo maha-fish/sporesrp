@@ -1,5 +1,0 @@
-{
-  "display": {"icon": {"item": "spore:outpost_watcher_enti"}, "title": {"translate": "sporesrp.advancement.hivemind_assault.title"}, "description": {"translate": "sporesrp.advancement.hivemind_assault.description"}, "frame": "challenge", "show_toast": true, "announce_to_chat": true, "hidden": false},
-  "parent": "sporesrp:hivemind_born",
-  "criteria": {"requirement": {"trigger": "minecraft:impossible"}}
-}

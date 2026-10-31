@@ -1,5 +1,0 @@
-{
-  "display": {"icon": {"id": "spore:sieger_spawnegg"}, "title": {"translate": "sporesrp.advancement.kill_boss_5.title"}, "description": {"translate": "sporesrp.advancement.kill_boss_5.description"}, "frame": "challenge", "show_toast": true, "announce_to_chat": true, "hidden": false},
-  "parent": "sporesrp:kill_boss",
-  "criteria": {"requirement": {"trigger": "minecraft:impossible"}}
-}

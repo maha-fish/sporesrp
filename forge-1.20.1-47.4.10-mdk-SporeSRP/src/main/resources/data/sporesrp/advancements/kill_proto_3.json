@@ -1,5 +1,0 @@
-{
-  "display": {"icon": {"item": "spore:brain_remnants"}, "title": {"translate": "sporesrp.advancement.kill_proto_3.title"}, "description": {"translate": "sporesrp.advancement.kill_proto_3.description"}, "frame": "challenge", "show_toast": true, "announce_to_chat": true, "hidden": false},
-  "parent": "sporesrp:kill_proto",
-  "criteria": {"requirement": {"trigger": "minecraft:impossible"}}
-}

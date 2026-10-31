@@ -8,13 +8,3 @@ run/
 .idea/
 *.iml
 .vscode/
-
-# 反编译与参考资料（不发布）
-_spore_probe/
-_forge_src/
-_neo_src/
-_ref/
-
-# 本地临时
-_push_log.txt
-_push_to_github.ps1
