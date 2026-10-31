@@ -1,0 +1,5 @@
+{
+  "display": {"icon": {"item": "minecraft:experience_bottle"}, "title": {"translate": "sporesrp.advancement.phase_10.title"}, "description": {"translate": "sporesrp.advancement.phase_10.description"}, "frame": "challenge", "show_toast": true, "announce_to_chat": true, "hidden": false},
+  "parent": "sporesrp:phase_6",
+  "criteria": {"requirement": {"trigger": "minecraft:impossible"}}
+}

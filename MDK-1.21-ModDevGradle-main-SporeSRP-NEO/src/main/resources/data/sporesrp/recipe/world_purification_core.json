@@ -1,0 +1,23 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "ABC",
+    "DEF",
+    "GHI"
+  ],
+  "key": {
+    "A": { "item": "spore:reforged_biomass_t" },
+    "B": { "item": "spore:amalgamated_heart" },
+    "C": { "item": "spore:cerebrum" },
+    "D": { "item": "spore:ice_canister" },
+    "E": { "item": "spore:cdu" },
+    "F": { "item": "spore:ice_canister" },
+    "G": { "item": "spore:wing_membrane" },
+    "H": { "item": "sporesrp:mind_core" },
+    "I": { "item": "spore:hyperbolized_liver" }
+  },
+  "result": {
+    "id": "sporesrp:world_purification_core",
+    "count": 1
+  }
+}
