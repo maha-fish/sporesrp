@@ -9,11 +9,19 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
+/**
+ * 演化数据同步包。
+ *
+ * <p>冷却不传「剩余秒数」而是传**结束的绝对世界时间 tick**：
+ * 客户端与服务端共用同一个世界时间，因此客户端直接用本地 gameTime 相减即可，
+ * 不受网络延迟和本地 tick 抖动影响，也无需周期性重发。
+ */
 public record SyncEvolutionDataPacket(
         int points,
         int phase,
         String difficulty,
-        int cooldownSeconds,
+        /** 冷却结束的绝对世界时间 tick；0 表示无冷却。 */
+        long cooldownEndTick,
         int currentThreshold,
         int nextThreshold
 ) implements CustomPacketPayload {
@@ -25,7 +33,7 @@ public record SyncEvolutionDataPacket(
             ByteBufCodecs.INT, SyncEvolutionDataPacket::points,
             ByteBufCodecs.INT, SyncEvolutionDataPacket::phase,
             ByteBufCodecs.STRING_UTF8, SyncEvolutionDataPacket::difficulty,
-            ByteBufCodecs.INT, SyncEvolutionDataPacket::cooldownSeconds,
+            ByteBufCodecs.VAR_LONG, SyncEvolutionDataPacket::cooldownEndTick,
             ByteBufCodecs.INT, SyncEvolutionDataPacket::currentThreshold,
             ByteBufCodecs.INT, SyncEvolutionDataPacket::nextThreshold,
             SyncEvolutionDataPacket::new
@@ -43,7 +51,7 @@ public record SyncEvolutionDataPacket(
                     packet.points,
                     packet.phase,
                     packet.difficulty,
-                    packet.cooldownSeconds,
+                    packet.cooldownEndTick,
                     packet.currentThreshold,
                     packet.nextThreshold
             );
@@ -60,41 +68,42 @@ public record SyncEvolutionDataPacket(
         private static int points = 0;
         private static int phase = 0;
         private static String difficulty = "SIMPLE";
-        private static int cooldownSeconds = -1;
-        private static long receiveWorldTime = 0;
+        /** 冷却结束的绝对世界时间 tick；0 表示无冷却。 */
+        private static long cooldownEndTick = 0;
         private static int currentThreshold = 0;
         private static int nextThreshold = 800;
         private static boolean hudEnabled = true;
 
-        public static void setEvolutionData(int pts, int ph, String diff, int cdSec,
+        public static void setEvolutionData(int pts, int ph, String diff, long endTick,
                                             int currentThr, int nextThr) {
-            // 服务端是唯一权威：无条件接受它给的冷却秒数，
-            // 并以本次接收时刻为基准重新开始本地倒数。
-            // （旧实现「只接受更小的秒数」，会把诱饵的加法冷却全部丢掉。）
+            // 服务端是唯一权威：直接记录冷却结束的绝对世界时间 tick。
+            // 客户端与服务端共用同一个世界时间，因此这里不需要「接收时刻」做基准，
+            // 也就没有网络延迟与本地 tick 抖动带来的累积误差。
             points = pts;
             phase = ph;
             difficulty = diff;
             currentThreshold = currentThr;
             nextThreshold = nextThr;
-            cooldownSeconds = cdSec;
-            receiveWorldTime = (Minecraft.getInstance().level != null)
-                    ? Minecraft.getInstance().level.getGameTime() : 0;
+            cooldownEndTick = endTick;
         }
 
         public static int getPoints() { return points; }
         public static int getPhase() { return phase; }
         public static String getDifficulty() { return difficulty; }
 
+        /**
+         * 剩余冷却秒数。仅当 HUD 绘制时调用（每帧一次），
+         * 只做一次取时间 + 一次减法，无分配、无状态变更。
+         *
+         * @return 剩余秒数；0 表示已就绪；-1 表示当前无法判断（未进入世界）
+         */
         public static int getCooldownSeconds() {
-            if (cooldownSeconds < 0) return -1;
-            if (Minecraft.getInstance().level == null) {
-                return cooldownSeconds;
-            }
-            long now = Minecraft.getInstance().level.getGameTime();
-            long elapsedTicks = now - receiveWorldTime;
-            long elapsedSeconds = elapsedTicks / 20;
-            int remaining = cooldownSeconds - (int) elapsedSeconds;
-            return Math.max(0, remaining);
+            if (cooldownEndTick <= 0) return 0;
+            var level = Minecraft.getInstance().level;
+            if (level == null) return -1; // 还没进世界，先不显示
+            long remainingTicks = cooldownEndTick - level.getGameTime();
+            if (remainingTicks <= 0) return 0;
+            return (int) ((remainingTicks + 19) / 20);
         }
 
         public static int getCurrentThreshold() { return currentThreshold; }
