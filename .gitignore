@@ -1,10 +1,25 @@
-# Gradle / 构建产物
-build/
-.gradle/
-run/
-*.class
+# eclipse
+bin
+*.launch
+.settings
+.metadata
+.classpath
+.project
 
-# IDE
-.idea/
+# idea
+out
+*.ipr
+*.iws
 *.iml
-.vscode/
+.idea
+
+# gradle
+build
+.gradle
+
+# other
+eclipse
+run
+
+# Files from Forge MDK
+forge*changelog.txt

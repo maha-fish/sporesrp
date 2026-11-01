@@ -49,10 +49,28 @@ public class WorldEvolutionData extends SavedData {
     public boolean isPointGainBlocked(long currentTick) { return currentTick < nextUpgradeAvailableTick; }
 
     /** 按「加法」延长点数冷却：已过期则从现在算起，未过期则在剩余上累加。 */
+    /**
+     * 统一时钟：冷却/点数判定一律使用**世界时间**。
+     *
+     * <p>历史遗留：有的调用点传 {@code level.getGameTime()}（跨存档累积），
+     * 而显示侧却用 {@code server.getTickCount()}（uptime，重启归零），
+     * 两个时钟一减就会得出上百万 tick 的荒谬倒计时。这里彻底统一。
+     */
+    private long nowTick() {
+        if (this.boundLevel != null) return this.boundLevel.getGameTime();
+        MinecraftServer server = cachedServer;
+        if (server != null) {
+            try { return server.overworld().getGameTime(); } catch (Throwable ignored) { }
+        }
+        return 0L;
+    }
+
     public void adjustPointCooldown(long currentTick, int seconds) {
         if (seconds == 0) return;
-        long base = Math.max(this.nextUpgradeAvailableTick, currentTick);
-        this.nextUpgradeAvailableTick = Math.max(currentTick, base + seconds * 20L);
+        long now = nowTick();
+        long base = Math.max(this.nextUpgradeAvailableTick, now);
+        this.nextUpgradeAvailableTick = Math.max(now, base + seconds * 20L);
+
         setDirty();
     }
     /**
@@ -62,18 +80,20 @@ public class WorldEvolutionData extends SavedData {
      */
     public void applyDecoyPoints(int points, int cooldownSeconds, long currentTick) {
         if (purified) return;
+
         this.evolutionPoints = Math.max(0, this.evolutionPoints - Math.max(0, points));
         // 只允许降阶。绝不能调 updatePhase —— 它可能把「落后于点数的阶段」补升一级，
         // 从而顺带把那个阶段的默认冷却也加上，表现为「诱饵把冷却拉回阶段默认值」。
         lowerPhaseOnly();
-        adjustPointCooldown(currentTick, cooldownSeconds);
+        adjustPointCooldown(nowTick(), cooldownSeconds);
         setDirty();
     }
 
     /** 单个诱饵生效：只叠加演化时间冷却，不改动演化点数。 */
     public void applyDecoyCooldown(int cooldownSeconds, long currentTick) {
         if (purified) return;
-        adjustPointCooldown(currentTick, cooldownSeconds);
+
+        adjustPointCooldown(nowTick(), cooldownSeconds);
         setDirty();
     }
 
@@ -173,7 +193,7 @@ public class WorldEvolutionData extends SavedData {
         }
         this.evolutionPoints = Math.max(0, points);
         setDirty();
-        updatePhase(currentTick);
+        updatePhase(nowTick());
     }
 
     // ★ 修改点：addEvolutionPoints 添加净化检查
@@ -186,10 +206,11 @@ public class WorldEvolutionData extends SavedData {
         }
         // 正数：受诱饵的「点数冷却」限制
         if (amount > 0) {
-            if (isPointGainBlocked(currentTick)) {
+            long now = nowTick();
+            if (isPointGainBlocked(now)) {
                 return;
             }
-            setEvolutionPoints(this.evolutionPoints + amount, currentTick);
+            setEvolutionPoints(this.evolutionPoints + amount, now);
             return;
         }
         // 负数：击杀只扣点数，**不降阶段**（SRP 语义：压阶段只能靠诱饵）
@@ -264,7 +285,8 @@ public class WorldEvolutionData extends SavedData {
         }
     }
 
-    private void updatePhase(long currentTick) {
+    private void updatePhase(long ignoredTick) {
+        long currentTick = nowTick();
         if (purified) {
             this.evolutionPhase = 0;
             setDirty();
@@ -294,9 +316,16 @@ public class WorldEvolutionData extends SavedData {
                 setDirty();
                 // 继续循环，不返回
             } else {
+                // 冷却中不得解锁新阶段（配置项文档：冷却时间内即使点数足够也不能升级）。
+                // 少了这道判断，onServerTick 每 tick 调一次 updatePhase 就会连升多级、
+                // 每级各叠一次阶段冷却。
+                if (currentTick < nextUpgradeAvailableTick) {
+                    break;
+                }
                 // 升级并解锁；同时按「加法」延长点数冷却
                 var cooldowns = Config.COMMON.phaseUpgradeCooldownSeconds.get();
                 int cooldownSeconds = (evolutionPhase < cooldowns.size()) ? cooldowns.get(evolutionPhase) : 0;
+
 
                 evolutionPhase = targetNextPhase;
                 unlockedPhases.add(targetNextPhase);
@@ -331,7 +360,7 @@ public class WorldEvolutionData extends SavedData {
 
         MinecraftServer server = net.minecraftforge.server.ServerLifecycleHooks.getCurrentServer();
         if (server != null) {
-            long now = server.getTickCount();
+            long now = server.overworld().getGameTime();
             int remaining = 0;
             if (nextUpgradeAvailableTick > now) {
                 long diffTicks = nextUpgradeAvailableTick - now;
@@ -447,7 +476,7 @@ public class WorldEvolutionData extends SavedData {
 
         // 恢复 pending 冷却（如果存在）
         if (data.pendingCooldownRemaining > 0) {
-            long now = server.getTickCount();
+            long now = server.overworld().getGameTime();
             data.nextUpgradeAvailableTick = now + data.pendingCooldownRemaining * 20L;
             data.pendingCooldownRemaining = -1;
             data.setDirty();
@@ -464,14 +493,14 @@ public class WorldEvolutionData extends SavedData {
 
     public void syncToClients(ServerLevel level) {
         if (level.isClientSide()) return;
-        int cooldownSeconds = getCooldownSeconds(level);
+        long cooldownEndTick = this.nextUpgradeAvailableTick;
         int currentThr = getCurrentThreshold();
         int nextThr = getNextThreshold();
         SyncEvolutionDataPacket packet = new SyncEvolutionDataPacket(
                 this.evolutionPoints,
                 this.evolutionPhase,
                 this.difficulty,
-                cooldownSeconds,
+                cooldownEndTick,
                 currentThr,
                 nextThr
         );
@@ -481,30 +510,20 @@ public class WorldEvolutionData extends SavedData {
     }
 
     public void syncToPlayer(ServerPlayer player) {
-        int cooldownSeconds = getCooldownSeconds(player.serverLevel());
+        long cooldownEndTick = this.nextUpgradeAvailableTick;
         int currentThr = getCurrentThreshold();
         int nextThr = getNextThreshold();
         SyncEvolutionDataPacket packet = new SyncEvolutionDataPacket(
                 this.evolutionPoints,
                 this.evolutionPhase,
                 this.difficulty,
-                cooldownSeconds,
+                cooldownEndTick,
                 currentThr,
                 nextThr
         );
         SporeSRP.CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), packet);
     }
 
-    private int getCooldownSeconds(ServerLevel level) {
-        // 满阶段也要照实返回：诱饵在满阶段仍能生效，HUD 不能因此不显示倒计时
-        long now = level.getServer().getTickCount();
-        long nextTick = this.nextUpgradeAvailableTick;
-        if (now >= nextTick) {
-            return 0; // 冷却已就绪
-        }
-        long diffTicks = nextTick - now;
-        return (int) ((diffTicks + 19) / 20); // 向上取整
-    }
 
 
     private int getCurrentThreshold() {
