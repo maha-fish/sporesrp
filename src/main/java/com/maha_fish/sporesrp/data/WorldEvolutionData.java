@@ -66,7 +66,9 @@ public class WorldEvolutionData extends SavedData {
     public void applyDecoyPoints(int points, int cooldownSeconds, long currentTick) {
         if (purified) return;
         this.evolutionPoints = Math.max(0, this.evolutionPoints - Math.max(0, points));
-        updatePhase(currentTick);
+        // 只允许降阶。绝不能调 updatePhase —— 它可能把「落后于点数的阶段」补升一级，
+        // 从而顺带把那个阶段的默认冷却也加上，表现为「诱饵把冷却拉回阶段默认值」。
+        lowerPhaseOnly();
         adjustPointCooldown(currentTick, cooldownSeconds);
         setDirty();
     }
@@ -219,6 +221,33 @@ public class WorldEvolutionData extends SavedData {
     }
 
 
+    /** 按当前演化点数推算应有的阶段（越界已夹到 maxPhase）。 */
+    private int computeTheoreticalPhase() {
+        var thresholds = Config.COMMON.phaseThresholds.get();
+        int maxPhase = Config.COMMON.getMaxPhase();
+        int theoretical = 0;
+        for (int i = thresholds.size() - 1; i >= 0; i--) {
+            if (evolutionPoints >= (Integer) thresholds.get(i)) {
+                theoretical = i;
+                break;
+            }
+        }
+        return Math.min(theoretical, maxPhase);
+    }
+
+    /**
+     * 只降不升：阶段若高于当前点数对应的阶段，就回退到该阶段。
+     *
+     * <p>诱饵专用 —— 诱饵的职责是压阶段，绝不能推进阶段（推进阶段会顺带收阶段冷却）。
+     */
+    private void lowerPhaseOnly() {
+        int theoretical = computeTheoreticalPhase();
+        if (theoretical < evolutionPhase) {
+            evolutionPhase = theoretical;
+            setDirty();
+        }
+    }
+
     private void updatePhase(long currentTick) {
         if (purified) {
             this.evolutionPhase = 0;
@@ -226,16 +255,8 @@ public class WorldEvolutionData extends SavedData {
             return;
         }
 
-        var thresholds = Config.COMMON.phaseThresholds.get();
         int maxPhase = Config.COMMON.getMaxPhase();
-        int theoreticalPhase = 0;
-        for (int i = thresholds.size() - 1; i >= 0; i--) {
-            if (evolutionPoints >= (Integer) thresholds.get(i)) {
-                theoreticalPhase = i;
-                break;
-            }
-        }
-        if (theoreticalPhase > maxPhase) theoreticalPhase = maxPhase;
+        int theoreticalPhase = computeTheoreticalPhase();
 
         // 降级处理：只是阶段回退，**不叠加任何冷却** ——
         // 冷却只由「升阶」和「诱饵」各自负责。否则一用诱饵压阶段，
