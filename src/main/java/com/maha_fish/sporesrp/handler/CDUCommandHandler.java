@@ -1,5 +1,6 @@
 package com.maha_fish.sporesrp.handler;
 
+import com.maha_fish.sporesrp.Config;
 import com.maha_fish.sporesrp.SporeSRP;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceKey;
@@ -62,8 +63,8 @@ public class CDUCommandHandler {
 
     // ========== 提交清除命令 ==========
     private static void submitClearCommand(ServerLevel level, BlockPos pos) {
-        int radius = 10;
-        int halfHeight = 15;
+        int radius = Config.COMMON.cduPurifyRadius.get();
+        int halfHeight = Config.COMMON.cduPurifyHalfHeight.get();
         int minX = pos.getX() - radius;
         int maxX = pos.getX() + radius;
         int minZ = pos.getZ() - radius;
