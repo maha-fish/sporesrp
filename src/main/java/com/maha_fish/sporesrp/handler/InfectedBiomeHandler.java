@@ -7,6 +7,16 @@ import com.maha_fish.sporesrp.util.SporeEntityCache;
 import com.maha_fish.sporesrp.util.SporeBridge;
 import com.maha_fish.sporesrp.util.SporeEntityHelper;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
+import net.minecraft.core.SectionPos;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.network.protocol.game.ClientboundChunksBiomesPacket;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.chunk.LevelChunk;
+import net.minecraft.world.level.chunk.LevelChunkSection;
+import net.minecraft.world.level.chunk.PalettedContainer;
+import net.minecraft.world.level.chunk.status.ChunkStatus;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
@@ -20,7 +30,9 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.registries.NeoForgeRegistries;
 import net.minecraft.core.registries.BuiltInRegistries;
 
+import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.UUID;
@@ -76,23 +88,92 @@ public class InfectedBiomeHandler {
 
     // ==================== 命令队列 ====================
     private static final Queue<Runnable> commandQueue = new ConcurrentLinkedQueue<>();
+    /** 本 tick 有群系改动的区块，攒起来统一下发（避免每区块单独发包）。 */
+    private static final List<LevelChunk> pendingBiomeChunks = new ArrayList<>();
 
-    private static void scheduleFillBiome(ServerLevel level, int minX, int minY, int minZ, int maxX, int maxY, int maxZ) {
-        int step = 16;
-        for (int x = minX; x <= maxX; x += step) {
-            int x1 = x, x2 = Math.min(x + step - 1, maxX);
-            for (int z = minZ; z <= maxZ; z += step) {
-                int z1 = z, z2 = Math.min(z + step - 1, maxZ);
-                for (int y = minY; y <= maxY; y += step) {
-                    int y1 = y, y2 = Math.min(y + step - 1, maxY);
-                    commandQueue.add(() -> {
-                        String cmd = String.format("fillbiome %d %d %d %d %d %d sporesrp:infected_biome", x1, y1, z1, x2, y2, z2);
-                        var source = level.getServer().createCommandSourceStack().withPermission(4).withSuppressedOutput();
-                        level.getServer().getCommands().performPrefixedCommand(source, cmd);
-                    });
+    /** 感染群系的 holder，按需解析（注册表在服务器重启后会换，所以每次批量任务开始时取一次）。 */
+    private static Holder<Biome> resolveInfectedBiome(ServerLevel level) {
+        return level.registryAccess()
+                .registryOrThrow(Registries.BIOME)
+                .getHolderOrThrow(ResourceKey.create(Registries.BIOME,
+                        ResourceLocation.fromNamespaceAndPath(SporeSRP.MOD_ID, "infected_biome")));
+    }
+
+    /**
+     * 把长方体区域按**区块**切分后入队。
+     *
+     * <p>相比原来的 {@code fillbiome}：不再逐方块写，而是每区块只处理一次；
+     * 群系格子本来就是 4×4×4 粒度，所以工作量约为逐方块方案的 1/57。
+     */
+    private static void scheduleBiomeRegion(ServerLevel level, int minX, int minY, int minZ,
+                                            int maxX, int maxY, int maxZ) {
+        Holder<Biome> target = resolveInfectedBiome(level);
+        int minCX = minX >> 4, maxCX = maxX >> 4;
+        int minCZ = minZ >> 4, maxCZ = maxZ >> 4;
+        for (int cx = minCX; cx <= maxCX; cx++) {
+            for (int cz = minCZ; cz <= maxCZ; cz++) {
+                final int fcx = cx, fcz = cz;
+                commandQueue.add(() -> {
+                    LevelChunk changed = convertChunkBiome(level, target, fcx, fcz, minX, minY, minZ, maxX, maxY, maxZ);
+                    if (changed != null) pendingBiomeChunks.add(changed);
+                });
+            }
+        }
+    }
+
+    /**
+     * 把单个已加载区块内、落在该区域里的群系格子写成目标群系。
+     *
+     * @return 有改动的区块；未加载或无改动返回 null
+     */
+    private static LevelChunk convertChunkBiome(ServerLevel level, Holder<Biome> target,
+                                                int cx, int cz,
+                                                int minX, int minY, int minZ,
+                                                int maxX, int maxY, int maxZ) {
+        if (!(level.getChunkSource().getChunk(cx, cz, ChunkStatus.FULL, false) instanceof LevelChunk chunk)) {
+            return null;
+        }
+        LevelChunkSection[] sections = chunk.getSections();
+        boolean changed = false;
+
+        int minSectionY = SectionPos.blockToSectionCoord(minY);
+        int maxSectionY = SectionPos.blockToSectionCoord(maxY);
+
+        for (int sectionY = minSectionY; sectionY <= maxSectionY; sectionY++) {
+            int idx = level.getSectionIndexFromSectionY(sectionY);
+            if (idx < 0 || idx >= sections.length) continue;
+            LevelChunkSection section = sections[idx];
+            if (section == null) continue;
+
+            // getBiomes() 的声明类型是只读接口，实际实现恒为 PalettedContainer；
+            // 拿不到可写实例就跳过这个 section（不影响正确性，只是这次不处理）。
+            if (!(section.getBiomes() instanceof PalettedContainer<Holder<Biome>> biomes)) continue;
+
+            int baseX = cx << 4;
+            int baseY = sectionY << 4;
+            int baseZ = cz << 4;
+
+            for (int cellX = 0; cellX < 4; cellX++) {
+                int blockX = baseX + (cellX << 2) + 2; // 取格子中心做范围判断
+                if (blockX < minX || blockX > maxX) continue;
+                for (int cellZ = 0; cellZ < 4; cellZ++) {
+                    int blockZ = baseZ + (cellZ << 2) + 2;
+                    if (blockZ < minZ || blockZ > maxZ) continue;
+                    for (int cellY = 0; cellY < 4; cellY++) {
+                        int blockY = baseY + (cellY << 2) + 2;
+                        if (blockY < minY || blockY > maxY) continue;
+
+                        if (biomes.get(cellX, cellY, cellZ) == target) continue; // 已是目标群系
+                        biomes.set(cellX, cellY, cellZ, target);
+                        changed = true;
+                    }
                 }
             }
         }
+
+        if (!changed) return null;
+        chunk.setUnsaved(true);
+        return chunk;
     }
 
     private static void replaceBiomeAround(ServerLevel level, BlockPos center, int radius) {
@@ -102,7 +183,7 @@ public class InfectedBiomeHandler {
         int halfHeight = getVerticalHeight() / 2;
         int minY = Math.max(level.getMinBuildHeight(), centerY - halfHeight);
         int maxY = Math.min(level.getMaxBuildHeight() - 1, centerY + halfHeight);
-        scheduleFillBiome(level, minX, minY, minZ, maxX, maxY, maxZ);
+        scheduleBiomeRegion(level, minX, minY, minZ, maxX, maxY, maxZ);
         SporeSRP.LOGGER.info("Scheduled biome replacement for radius {} around {}", radius, center);
     }
 
@@ -186,6 +267,9 @@ public class InfectedBiomeHandler {
     }
 
     // ==================== 命令队列处理 ====================
+    /**
+     * 每 tick 处理有限个区块任务，并把本 tick 改动过的区块**合并成一个**群系包发出。
+     */
     private static void processCommandQueue() {
         int max = getMaxCommandsPerTick();
         int executed = 0;
@@ -196,8 +280,24 @@ public class InfectedBiomeHandler {
                 task.run();
                 executed++;
             } catch (Exception e) {
-                SporeSRP.LOGGER.warn("Failed to execute fillbiome command", e);
+                SporeSRP.LOGGER.warn("Failed to convert chunk biome", e);
             }
+        }
+        flushBiomePacket();
+    }
+
+    private static void flushBiomePacket() {
+        if (pendingBiomeChunks.isEmpty()) return;
+        try {
+            ClientboundChunksBiomesPacket packet = ClientboundChunksBiomesPacket.forChunks(pendingBiomeChunks);
+            ServerLevel level = (ServerLevel) pendingBiomeChunks.get(0).getLevel();
+            for (ServerPlayer player : level.players()) {
+                player.connection.send(packet);
+            }
+        } catch (Exception e) {
+            SporeSRP.LOGGER.warn("Failed to send biome packet", e);
+        } finally {
+            pendingBiomeChunks.clear();
         }
     }
 
@@ -205,6 +305,7 @@ public class InfectedBiomeHandler {
     @SubscribeEvent
     public void onServerStopped(net.neoforged.neoforge.event.server.ServerStoppedEvent event) {
         commandQueue.clear();
+        pendingBiomeChunks.clear();
     }
 
     // ==================== 事件监听 ====================
