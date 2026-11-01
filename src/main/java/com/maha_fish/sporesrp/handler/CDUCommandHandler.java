@@ -2,6 +2,12 @@ package com.maha_fish.sporesrp.handler;
 
 import com.maha_fish.sporesrp.Config;
 import com.maha_fish.sporesrp.SporeSRP;
+import com.maha_fish.sporesrp.util.BiomeRegionConverter;
+import net.minecraft.core.Holder;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
@@ -25,6 +31,8 @@ public class CDUCommandHandler {
     private static final Map<ResourceKey<Level>, Map<BlockPos, PurificationData>> ACTIVE_CDUS = new ConcurrentHashMap<>();
     private static final java.util.concurrent.ConcurrentLinkedQueue<Runnable> COMMAND_QUEUE = new java.util.concurrent.ConcurrentLinkedQueue<>();
     private static final int MAX_COMMANDS_PER_TICK = 20;
+    /** 本 tick 有群系改动的区块，攒起来统一下发。 */
+    private static final java.util.List<LevelChunk> PENDING_CLEAR_CHUNKS = new java.util.ArrayList<>();
 
     private static class PurificationData {
         int totalRemaining;
@@ -61,10 +69,24 @@ public class CDUCommandHandler {
         return ACTIVE_CDUS.computeIfAbsent(dimension, k -> new ConcurrentHashMap<>());
     }
 
-    // ========== 提交清除命令 ==========
+    // ========== 提交清除任务 ==========
+    /** 目标群系 / 只清理的来源群系；均为注册表 holder，比较用引用相等。 */
+    private static Holder<Biome> holder(ServerLevel level, ResourceLocation id) {
+        return level.registryAccess()
+                .registryOrThrow(Registries.BIOME)
+                .getHolderOrThrow(ResourceKey.create(Registries.BIOME, id));
+    }
+
+    /**
+     * 把 CDU 周围的感染群系改回平原。
+     *
+     * <p>不再逐方块 {@code fillbiome}，而是按区块直写 biome palette，
+     * 且**只替换当前确实是感染群系的格子** —— 原生群系（沙漠、针叶林等）不会被一并抹成平原。
+     */
     private static void submitClearCommand(ServerLevel level, BlockPos pos) {
         int radius = Config.COMMON.cduPurifyRadius.get();
         int halfHeight = Config.COMMON.cduPurifyHalfHeight.get();
+
         int minX = pos.getX() - radius;
         int maxX = pos.getX() + radius;
         int minZ = pos.getZ() - radius;
@@ -72,25 +94,22 @@ public class CDUCommandHandler {
         int minY = Math.max(level.getMinBuildHeight(), pos.getY() - halfHeight);
         int maxY = Math.min(level.getMaxBuildHeight() - 1, pos.getY() + halfHeight);
 
-        int step = 16;
-        for (int x = minX; x <= maxX; x += step) {
-            int x1 = x, x2 = Math.min(x + step - 1, maxX);
-            for (int z = minZ; z <= maxZ; z += step) {
-                int z1 = z, z2 = Math.min(z + step - 1, maxZ);
-                for (int y = minY; y <= maxY; y += step) {
-                    int y1 = y, y2 = Math.min(y + step - 1, maxY);
-                    COMMAND_QUEUE.add(() -> {
-                        String cmd = String.format("fillbiome %d %d %d %d %d %d minecraft:plains", x1, y1, z1, x2, y2, z2);
-                        var source = level.getServer().createCommandSourceStack()
-                                .withPermission(4)
-                                .withSuppressedOutput();
-                        level.getServer().getCommands().performPrefixedCommand(source, cmd);
-                    });
-                }
+        Holder<Biome> target = holder(level, ResourceLocation.fromNamespaceAndPath("minecraft", "plains"));
+        Holder<Biome> infected = holder(level, ResourceLocation.fromNamespaceAndPath(SporeSRP.MOD_ID, "infected_biome"));
+
+        int minCX = minX >> 4, maxCX = maxX >> 4;
+        int minCZ = minZ >> 4, maxCZ = maxZ >> 4;
+        for (int cx = minCX; cx <= maxCX; cx++) {
+            for (int cz = minCZ; cz <= maxCZ; cz++) {
+                final int fcx = cx, fcz = cz;
+                COMMAND_QUEUE.add(() -> {
+                    LevelChunk changed = BiomeRegionConverter.convertChunk(
+                            level, target, infected, fcx, fcz, minX, minY, minZ, maxX, maxY, maxZ);
+                    if (changed != null) PENDING_CLEAR_CHUNKS.add(changed);
+                });
             }
         }
     }
-
     // ========== 对外 API ==========
     public static void startPurification(ServerLevel level, BlockPos pos) {
         ResourceKey<Level> dim = level.dimension();
@@ -128,7 +147,18 @@ public class CDUCommandHandler {
                 COMMAND_QUEUE.poll().run();
                 executed++;
             } catch (Exception e) {
-                SporeSRP.LOGGER.warn("Failed to execute CDU fillbiome command", e);
+                SporeSRP.LOGGER.warn("Failed to convert CDU biome", e);
+            }
+        }
+
+        // 本 tick 改动过的区块合并成一个群系包发出
+        if (!PENDING_CLEAR_CHUNKS.isEmpty()) {
+            try {
+                BiomeRegionConverter.sendBiomePacket(PENDING_CLEAR_CHUNKS);
+            } catch (Exception e) {
+                SporeSRP.LOGGER.warn("Failed to send CDU biome packet", e);
+            } finally {
+                PENDING_CLEAR_CHUNKS.clear();
             }
         }
 
