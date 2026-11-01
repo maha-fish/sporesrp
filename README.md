@@ -1,3 +1,5 @@
+[English](README.en.md) | **中文**
+
 # Spore:SRP!
 
 Spore 附属 Mod 的源码仓库，Forge 与 NeoForge 各占一个分支。
@@ -7,19 +9,17 @@ Spore 附属 Mod 的源码仓库，Forge 与 NeoForge 各占一个分支。
 | Forge | 1.20.1（47.x） | [`forge-1.20.1`](https://github.com/maha-fish/sporesrp/tree/forge-1.20.1) | 17 |
 | NeoForge | 1.21.1（21.x） | [`neo-1.21.1`](https://github.com/maha-fish/sporesrp/tree/neo-1.21.1) | 21 |
 
-`main` 分支只放本 README 与 `.gitignore`，不含源码。
+`main` 分支只放这两份 README 与 `.gitignore`，不含源码。
 
 ---
 
-## 中文
-
-### 环境要求
+## 环境要求
 
 - 两个分支都需要 JDK（Forge 17 / NeoForge 21），由 Gradle toolchain 校验
 - 平台 SDK 由构建插件自动拉取，无需手动安装
 - Gradle Wrapper 已随仓库提供，无需本地 Gradle
 
-### 构建
+## 构建
 
 ```bash
 git clone -b forge-1.20.1 https://github.com/maha-fish/sporesrp.git
@@ -35,7 +35,7 @@ cd sporesrp
 | `runClient` / `runServer` | 启动开发环境客户端 / 服务端 |
 | `runData` | 数据生成（如分支内配置了 datagen） |
 
-### 设计约束
+## 设计约束
 
 **没有编译期 Spore 依赖。** 与 Spore 的一切交互都走两条路：
 
@@ -44,7 +44,7 @@ cd sporesrp
 
 因此 Spore 缺失时 Mod 不会崩，只是相关功能不生效。新增对 Spore 的依赖时请保持这个约定。
 
-### 代码结构
+## 代码结构
 
 | 包 / 类 | 职责 |
 |---|---|
@@ -60,7 +60,7 @@ cd sporesrp
 | `util/EntityRemoval` | 直写 `removalReason` + 手动发移除包 |
 | `client/HUDOverlay` | 演化信息 HUD，本地按 tick 倒数 |
 
-### 两条硬性约定
+## 两条硬性约定
 
 **① 冷却只能增减，不能绝对设置。**
 
@@ -70,7 +70,7 @@ cd sporesrp
 
 `setDirty()` 被覆写为「标记待同步」，由 `SporeEntityCache` 的 tick 钩子每 tick 统一 flush 一次。新增改动状态的方法只要照常调 `setDirty()`，不必在调用点手动发同步包。
 
-### 两端 API 差异备忘
+## 两端 API 差异备忘
 
 迁移代码时基本都会撞上这几处：
 
@@ -85,89 +85,3 @@ cd sporesrp
 | 作物取消方式 | `Event.Result.DENY` | `CropGrowEvent.Pre.Result.DO_NOT_GROW` |
 | 刷怪终局事件 | `MobSpawnEvent.FinalizeSpawn`（嵌套） | `FinalizeSpawnEvent`（顶层） |
 | 生产环境反射字段名 | SRG，须用 `ObfuscationReflectionHelper` | 官方映射，可直接 `getDeclaredField` |
-
----
-
-## English
-
-Source repository for a Spore addon, one branch per mod loader.
-
-| Platform | Version | Branch | JDK |
-|---|---|---|---|
-| Forge | 1.20.1 (47.x) | [`forge-1.20.1`](https://github.com/maha-fish/sporesrp/tree/forge-1.20.1) | 17 |
-| NeoForge | 1.21.1 (21.x) | [`neo-1.21.1`](https://github.com/maha-fish/sporesrp/tree/neo-1.21.1) | 21 |
-
-The `main` branch holds only this README and `.gitignore`; it contains no source code.
-
-### Requirements
-
-- A JDK matching the branch (17 for Forge, 21 for NeoForge); enforced by the Gradle toolchain
-- Platform SDKs are fetched by the build plugin — nothing to install manually
-- The Gradle wrapper is committed, so no local Gradle is needed
-
-### Building
-
-```bash
-git clone -b forge-1.20.1 https://github.com/maha-fish/sporesrp.git
-cd sporesrp
-./gradlew build          # Windows: gradlew.bat build
-```
-
-Outputs land in `build/libs/`. Common tasks:
-
-| Task | Purpose |
-|---|---|
-| `build` | Compile and package |
-| `runClient` / `runServer` | Launch a dev client / server |
-| `runData` | Data generation (where configured) |
-
-### Design constraint
-
-**There is no compile-time dependency on Spore.** Every interaction goes through one of two paths:
-
-1. Registry id string comparison (`spore:proto`, `spore:mound`, `spore:scent`, …), contained in `util/SporeEntityHelper`
-2. Reflection over Spore's public methods (`Mound#getAge`, `Mound#getLinked`) and config fields, contained in `util/SporeBridge`, with degraded behaviour on failure
-
-As a result the mod does not crash when Spore is absent; the related features simply do nothing. Keep this contract when adding new Spore interactions.
-
-### Code layout
-
-| Package / class | Responsibility |
-|---|---|
-| `data/WorldEvolutionData` | Evolution state (SavedData). The **only** writer of points, phase and cooldown |
-| `phase/PhaseEffects` | Side effects of a phase change (broadcast, attribute refresh, event dispatch) |
-| `handler/*` | Event handlers (spawning, conversion, support, purification, phase gating, …) |
-| `block/`, `item/` | Decoy block and items, creative tab |
-| `config/SporeConfigBridge` | Writes config into Spore's in-memory specs after startup, then flushes to disk |
-| `network/` | Client sync packet and HUD data holder |
-| `util/SporeEntityHelper` | Entity checks and spawn pools, with registry-id caching |
-| `util/SporeEntityCache` | Per-dimension index of living entities, refreshed each tick |
-| `util/SporeBridge` | Reflective reads of Spore internals, degrades on failure |
-| `util/EntityRemoval` | Writes `removalReason` directly plus sends the removal packet |
-| `client/HUDOverlay` | Evolution HUD, counts down locally per tick |
-
-### Two hard rules
-
-**① Cooldown can only be added or subtracted, never set absolutely.**
-
-`WorldEvolutionData.adjustPointCooldown(tick, seconds)` is the single entry point: positive adds, negative subtracts, and the result never lands before the current tick. Do not introduce `setXxxCooldown`. Dropping a phase does not touch the cooldown.
-
-**② Every write syncs itself.**
-
-`setDirty()` is overridden to mark the state dirty, and `SporeEntityCache`'s tick hook flushes it once per tick. Any new mutator only needs to call `setDirty()`; call sites never send sync packets manually.
-
-### Platform API notes
-
-These are the differences you will hit when porting code:
-
-| Case | Forge 1.20.1 | NeoForge 1.21.1 |
-|---|---|---|
-| Block right-click | `Block#use(…, InteractionHand, …)` | split into `useItemOn` / `useWithoutItem` |
-| Block with a block entity | not required | `codec()` must be implemented |
-| Item-attached data | `ItemStack` NBT | `DataComponents` |
-| Recipe directory | `data/<ns>/recipes/` | `data/<ns>/recipe/` |
-| Recipe result key | `"item"` | `"id"` |
-| Crop growth event | `BlockEvent.CropGrowEvent.Pre` | `event.level.block.CropGrowEvent.Pre` |
-| Cancelling crop growth | `Event.Result.DENY` | `CropGrowEvent.Pre.Result.DO_NOT_GROW` |
-| Spawn finalisation | `MobSpawnEvent.FinalizeSpawn` (nested) | `FinalizeSpawnEvent` (top level) |
-| Reflection on production field names | SRG — use `ObfuscationReflectionHelper` | official mappings — plain `getDeclaredField` |
