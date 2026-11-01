@@ -214,6 +214,10 @@ public class Config {
         public final ModConfigSpec.IntValue decoyAggroRadius;
         public final ModConfigSpec.BooleanValue decoyProvokeProto;
 
+        // ========== CDU 净化 ==========
+        public final ModConfigSpec.IntValue cduPurifyRadius;
+        public final ModConfigSpec.IntValue cduPurifyHalfHeight;
+
         Common(ModConfigSpec.Builder builder) {
             builder.push("evolution");
             phaseThresholds = builder.comment("各阶段所需点数阈值，列表长度即为最大阶段数+1")
@@ -876,6 +880,17 @@ public class Config {
             decoyProvokeProto = builder
                     .comment("世界存在 Proto 时，饵堆必定让其中一只注意到玩家")
                     .define("forceProtoAggro", true);
+            builder.pop();
+
+            // ==================== CDU 净化 ====================
+            builder.push("cdu");
+            cduPurifyRadius = builder
+                    .comment("CDU 净化感染群系时的水平半径（格）")
+                    .defineInRange("purifyRadius", 16, 1, 128);
+            cduPurifyHalfHeight = builder
+                    .comment("CDU 净化的垂直半高（格）",
+                            "总高度约为该值的两倍")
+                    .defineInRange("purifyHalfHeight", 24, 1, 128);
             builder.pop();
 
         }
