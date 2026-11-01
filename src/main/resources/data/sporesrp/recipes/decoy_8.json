@@ -5,7 +5,11 @@
     { "item": "sporesrp:decoy_7" },
     { "item": "spore:mutated_fiber" },
     { "item": "spore:mutated_fiber" },
-    { "item": "spore:tumor" }
+    { "item": "spore:tumor" },
+    { "item": "spore:wing_membrane" },
+    { "item": "spore:hyperbolized_liver" },
+    { "item": "spore:cerebrum" },
+    { "item": "spore:amalgamated_heart" }
   ],
   "result": {
     "item": "sporesrp:decoy_8",

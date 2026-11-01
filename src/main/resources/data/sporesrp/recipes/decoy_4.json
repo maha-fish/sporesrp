@@ -5,7 +5,8 @@
     { "item": "sporesrp:decoy_3" },
     { "item": "spore:mutated_fiber" },
     { "item": "spore:mutated_fiber" },
-    { "item": "spore:tumor" }
+    { "item": "spore:tumor" },
+    { "item": "spore:wing_membrane" }
   ],
   "result": {
     "item": "sporesrp:decoy_4",

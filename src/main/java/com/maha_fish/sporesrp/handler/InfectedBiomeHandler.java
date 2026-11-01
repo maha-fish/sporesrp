@@ -3,6 +3,7 @@ package com.maha_fish.sporesrp.handler;
 import com.maha_fish.sporesrp.Config;
 import com.maha_fish.sporesrp.SporeSRP;
 import com.maha_fish.sporesrp.data.WorldEvolutionData;
+import com.maha_fish.sporesrp.util.BiomeRegionConverter;
 import com.maha_fish.sporesrp.util.SporeEntityCache;
 import com.maha_fish.sporesrp.util.SporeEntityHelper;
 import com.maha_fish.sporesrp.util.SporeBridge;
@@ -130,51 +131,8 @@ public class InfectedBiomeHandler {
                                                 int cx, int cz,
                                                 int minX, int minY, int minZ,
                                                 int maxX, int maxY, int maxZ) {
-        if (!(level.getChunkSource().getChunk(cx, cz, ChunkStatus.FULL, false) instanceof LevelChunk chunk)) {
-            return null;
-        }
-        LevelChunkSection[] sections = chunk.getSections();
-        boolean changed = false;
-
-        int minSectionY = SectionPos.blockToSectionCoord(minY);
-        int maxSectionY = SectionPos.blockToSectionCoord(maxY);
-
-        for (int sectionY = minSectionY; sectionY <= maxSectionY; sectionY++) {
-            int idx = level.getSectionIndexFromSectionY(sectionY);
-            if (idx < 0 || idx >= sections.length) continue;
-            LevelChunkSection section = sections[idx];
-            if (section == null) continue;
-
-            // getBiomes() 的声明类型是只读接口，实际实现恒为 PalettedContainer；
-            // 拿不到可写实例就跳过这个 section（不影响正确性，只是这次不处理）。
-            if (!(section.getBiomes() instanceof PalettedContainer<Holder<Biome>> biomes)) continue;
-            int baseX = cx << 4;
-            int baseY = sectionY << 4;
-            int baseZ = cz << 4;
-
-            for (int cellX = 0; cellX < 4; cellX++) {
-                int blockX = baseX + (cellX << 2) + 2; // 取格子中心做范围判断
-                if (blockX < minX || blockX > maxX) continue;
-                for (int cellZ = 0; cellZ < 4; cellZ++) {
-                    int blockZ = baseZ + (cellZ << 2) + 2;
-                    if (blockZ < minZ || blockZ > maxZ) continue;
-                    for (int cellY = 0; cellY < 4; cellY++) {
-                        int blockY = baseY + (cellY << 2) + 2;
-                        if (blockY < minY || blockY > maxY) continue;
-
-                        if (biomes.get(cellX, cellY, cellZ) == target) continue; // 已是目标群系（注册表 holder 同一实例）
-                        biomes.set(cellX, cellY, cellZ, target);
-                        changed = true;
-                    }
-                }
-            }
-        }
-
-        if (!changed) return null;
-        chunk.setUnsaved(true);
-        return chunk;
+        return BiomeRegionConverter.convertChunk(level, target, null, cx, cz, minX, minY, minZ, maxX, maxY, maxZ);
     }
-
     private static void replaceBiomeAround(ServerLevel level, BlockPos center, int radius) {
         int minX = center.getX() - radius, maxX = center.getX() + radius;
         int minZ = center.getZ() - radius, maxZ = center.getZ() + radius;
@@ -291,11 +249,7 @@ public class InfectedBiomeHandler {
     private static void flushBiomePacket() {
         if (pendingBiomeChunks.isEmpty()) return;
         try {
-            ClientboundChunksBiomesPacket packet = ClientboundChunksBiomesPacket.forChunks(pendingBiomeChunks);
-            ServerLevel level = (ServerLevel) pendingBiomeChunks.get(0).getLevel();
-            for (ServerPlayer player : level.players()) {
-                player.connection.send(packet);
-            }
+            BiomeRegionConverter.sendBiomePacket(pendingBiomeChunks);
         } catch (Exception e) {
             SporeSRP.LOGGER.warn("Failed to send biome packet", e);
         } finally {
