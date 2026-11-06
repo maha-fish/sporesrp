@@ -307,6 +307,7 @@ public class PhaseEffects {
     public static void onPlayerSleep(PlayerSleepInBedEvent event) {
         Player player = event.getEntity();
         if (player.level().isClientSide) return;
+        if (!Config.COMMON.preventSleep.get()) return;
         ServerLevel level = (ServerLevel) player.level();
         int phase = WorldEvolutionData.get(level).getEvolutionPhase();
         if (phase >= 6) {
