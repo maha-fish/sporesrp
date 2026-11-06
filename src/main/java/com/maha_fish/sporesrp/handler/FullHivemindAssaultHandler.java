@@ -2,6 +2,7 @@ package com.maha_fish.sporesrp.handler;
 
 import com.maha_fish.sporesrp.Config;
 import com.maha_fish.sporesrp.SporeSRP;
+import com.maha_fish.sporesrp.util.SporeSpawnHelper;
 import com.maha_fish.sporesrp.data.WorldEvolutionData;
 import com.maha_fish.sporesrp.util.AdvancementTriggerHelper;
 import com.maha_fish.sporesrp.util.SporeEntityHelper;
@@ -278,6 +279,10 @@ public class FullHivemindAssaultHandler {
             mobEntity.setTarget(target);
         }
 
+        // 入场前 finalize：Infected 的蜂巢链接与初始点数都在那里
+        if (mob instanceof Mob assaultMob) {
+            SporeSpawnHelper.finalizeBeforeAdd(assaultMob);
+        }
         level.addFreshEntity(mob);
         return true;
     }

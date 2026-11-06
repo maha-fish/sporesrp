@@ -18,9 +18,20 @@ public class Config {
 
         // 适应性系统配置
         public final ForgeConfigSpec.BooleanValue enableAdaptation;
-        public final ForgeConfigSpec.DoubleValue reductionPerHit;
-        public final ForgeConfigSpec.ConfigValue<List<? extends Double>> baseImmunity;
-        public final ForgeConfigSpec.ConfigValue<List<? extends Double>> finalMaxReduction;
+        public final ForgeConfigSpec.ConfigValue<List<? extends String>> adaptationTiers;
+        public final ForgeConfigSpec.ConfigValue<List<? extends Integer>> adaptationMaxTypes;
+        public final ForgeConfigSpec.DoubleValue adaptationPhaseGrowth;
+        public final ForgeConfigSpec.DoubleValue adaptationMaxTotalReduction;
+
+        // ========== 伤害适应的视觉反馈 ==========
+        public final ForgeConfigSpec.BooleanValue adaptationVisualEnabled;
+        public final ForgeConfigSpec.IntValue adaptationFlashDurationTicks;
+        public final ForgeConfigSpec.ConfigValue<String> adaptationAdaptingColor;
+        public final ForgeConfigSpec.ConfigValue<String> adaptationFullColor;
+        public final ForgeConfigSpec.DoubleValue adaptationFlashAlpha;
+        public final ForgeConfigSpec.BooleanValue adaptationFlashParticles;
+        public final ForgeConfigSpec.IntValue adaptationFlashParticleCount;
+        public final ForgeConfigSpec.BooleanValue adaptationFullSound;
 
         // 支援系统配置
         public final ForgeConfigSpec.BooleanValue enableSupportSystem;
@@ -32,14 +43,18 @@ public class Config {
         public final ForgeConfigSpec.DoubleValue supportSecondLowerChance;
         public final ForgeConfigSpec.DoubleValue supportScentChance;
         public final ForgeConfigSpec.IntValue supportCooldownSeconds;
+        public final ForgeConfigSpec.DoubleValue supportThrowHorizontal;
+        public final ForgeConfigSpec.DoubleValue supportThrowUpward;
+        public final ForgeConfigSpec.IntValue supportSummonedNoAggroSeconds;
+        public final ForgeConfigSpec.IntValue supportSummonedLifetimeSeconds;
         public final ForgeConfigSpec.DoubleValue supportMinSpawnDistance;
         public final ForgeConfigSpec.DoubleValue supportMaxSpawnDistance;
 
-        public final ForgeConfigSpec.ConfigValue<List<? extends String>> poolSmall;
-        public final ForgeConfigSpec.ConfigValue<List<? extends String>> poolMedium;
-        public final ForgeConfigSpec.ConfigValue<List<? extends String>> poolLarge;
-        public final ForgeConfigSpec.ConfigValue<List<? extends String>> poolBoss;
-        public final ForgeConfigSpec.ConfigValue<List<? extends String>> organoids;
+        // ========== 生物等级（按 Spore 继承体系推导，不再维护刷怪名单） ==========
+        public final ForgeConfigSpec.ConfigValue<List<? extends String>> sporeTierOrganoid;
+        public final ForgeConfigSpec.ConfigValue<List<? extends String>> sporeTierUtility;
+        public final ForgeConfigSpec.ConfigValue<List<? extends String>> sporeTierExtra;
+        public final ForgeConfigSpec.ConfigValue<List<? extends String>> sporeTierExclude;
 
         // 转化系统配置
         public final ForgeConfigSpec.DoubleValue conversionSmallMaxHp;
@@ -227,6 +242,23 @@ public class Config {
         public final ForgeConfigSpec.IntValue decoyAggroRadius;
         public final ForgeConfigSpec.BooleanValue decoyProvokeProto;
 
+        // ========== 环境效果（纯客户端） ==========
+        public final ForgeConfigSpec.BooleanValue environmentEnabled;
+        public final ForgeConfigSpec.BooleanValue environmentFogEnabled;
+        public final ForgeConfigSpec.ConfigValue<List<? extends Double>> environmentFogNearByPhase;
+        public final ForgeConfigSpec.ConfigValue<List<? extends Double>> environmentFogFarByPhase;
+        public final ForgeConfigSpec.ConfigValue<List<? extends Double>> environmentFogTintByPhase;
+        public final ForgeConfigSpec.DoubleValue environmentFogTintRed;
+        public final ForgeConfigSpec.DoubleValue environmentFogTintGreen;
+        public final ForgeConfigSpec.DoubleValue environmentFogTintBlue;
+        public final ForgeConfigSpec.BooleanValue environmentParticlesEnabled;
+        public final ForgeConfigSpec.IntValue environmentParticlePhase;
+        public final ForgeConfigSpec.BooleanValue environmentBiomeFogEnabled;
+        public final ForgeConfigSpec.DoubleValue environmentBiomeFogNear;
+        public final ForgeConfigSpec.DoubleValue environmentBiomeFogFar;
+        public final ForgeConfigSpec.DoubleValue environmentBiomeFogTint;
+        public final ForgeConfigSpec.DoubleValue environmentParticlesPerSecond;
+
         // ========== CDU 净化 ==========
         public final ForgeConfigSpec.IntValue cduPurifyRadius;
         public final ForgeConfigSpec.IntValue cduPurifyHalfHeight;
@@ -272,103 +304,51 @@ public class Config {
 
             builder.pop();
 
-            builder.push("pools");
-            poolSmall = builder.comment("小等级生物池")
-                    .defineList("small", List.of(
-                            "spore:inf_human",
-                            "spore:inf_husk",
-                            "spore:inf_drowned",
-                            "spore:inf_villager",
-                            "spore:inf_diseased_villager",
-                            "spore:inf_wanderer",
-                            "spore:inf_witch",
-                            "spore:inf_pillager",
-                            "spore:inf_player",
-                            "spore:inf_hazmat",
-                            "spore:inf_vindicator",
-                            "spore:inf_evoker"
-                    ), o -> o instanceof String);
-
-            poolMedium = builder.comment("中等级生物池")
-                    .defineList("medium", List.of(
-                            "spore:knight",
-                            "spore:griefer",
-                            "spore:braiomil",
-                            "spore:busser",
-                            "spore:thorn",
-                            "spore:jagd",
-                            "spore:scavenger",
-                            "spore:bloater",
-                            "spore:naiad",
-                            "spore:leaper",
-                            "spore:slasher",
-                            "spore:spitter",
-                            "spore:volatile",
-                            "spore:mephitic",
-                            "spore:gorgon",
-                            "spore:howler",
-                            "spore:stalker",
-                            "spore:brute",
-                            "spore:nuclea",
-                            "spore:protector",
-                            "spore:gargoyle",
-                            "spore:conductor",
-                            "spore:chemist",
-                            "spore:inebriater",
-                            "spore:saugling",
-                            "spore:vanguard",
-                            "spore:reaper",
-                            "spore:mound",
-                            "spore:umarmed",
-                            "spore:usurper",
-                            "spore:vigil",
-                            "spore:braurei",
-                            "spore:verva",
-                            "spore:delusioner",
-                            "spore:reconstructor",
-                            "spore:hivetumor"
-                    ), o -> o instanceof String);
-
-            poolLarge = builder.comment("大等级生物池")
-                    .defineList("large", List.of(
-                            "spore:inquisitor",
-                            "spore:brot",
-                            "spore:grober",
-                            "spore:wendigo",
-                            "spore:ogre",
-                            "spore:hvindicator",
-                            "spore:hevoker",
-                            "spore:proto"
-                    ), o -> o instanceof String);
-
-            poolBoss = builder.comment("Boss等级生物池")
-                    .defineList("boss", List.of(
-                            "spore:sieger",
-                            "spore:howitzer",
-                            "spore:stahl",
-                            "spore:hohlfresser",
-                            "spore:gazenbreacher",
-                            "spore:kraken",
-                            "spore:leviathan",
-                            "spore:hindenburg",
-                            "spore:verfall"
-                    ), o -> o instanceof String);
-
-            organoids = builder.comment("类器官体列表（用于过滤）")
-                    .defineList("organoids", List.of(
-                            "spore:mound",
-                            "spore:umarmed",
-                            "spore:usurper",
-                            "spore:vigil",
-                            "spore:braurei",
-                            "spore:verva",
-                            "spore:delusioner",
-                            "spore:reconstructor",
-                            "spore:proto",
-                            "spore:hivetumor"
-                    ), o -> o instanceof String);
+            // ==================== 生物等级（按 Spore 继承体系推导） ====================
+            builder.push("spore_tier");
+            sporeTierOrganoid = builder
+                    .comment("类器官的等级标注：类器官既属于 organoids 组，也要归入某个等级",
+                            "格式：实体ID=等级（small / medium / large / boss）",
+                            "未标注的类器官仍属于类器官组，但不会进入任何等级池")
+                    .defineList("organoidTier",
+                            List.of(
+                                    "mound=medium",
+                                    "umarmed=medium",
+                                    "usurper=medium",
+                                    "vigil=medium",
+                                    "braurei=medium",
+                                    "verva=medium",
+                                    "delusioner=medium",
+                                    "reconstructor=medium",
+                                    "hivetumor=medium",
+                                    "proto=large"
+                            ),
+                            o -> o instanceof String);
+            sporeTierUtility = builder
+                    .comment("无继承等级的敌对生物补充标注（这些类不继承 Infected，也不是 Organoid / Calamity）",
+                            "格式同上")
+                    .defineList("utilityTier",
+                            List.of(
+                                    "vanguard=medium",
+                                    "reaper=medium"
+                            ),
+                            o -> o instanceof String);
+            sporeTierExtra = builder
+                    .comment("★玩家入口★ 把任意模组的生物加进等级池，或覆盖已有分级",
+                            "格式：实体ID=等级   （等级：small / medium / large / boss）",
+                            "等级写 organoids 表示只加入类器官组、不指定等级",
+                            "同一个实体可写多行，例如同时写 =medium 和 =organoids",
+                            "省略命名空间时按 spore: 处理；示例：",
+                            "  minecraft:zombie=small",
+                            "  spore:knight=large          ← 覆盖继承体系给出的 medium",
+                            "  mymod:my_boss=boss")
+                    .defineList("extraTier", List.of(), o -> o instanceof String);
+            sporeTierExclude = builder
+                    .comment("★玩家入口★ 从所有等级池中移除生物（包含继承体系自动派生出来的）",
+                            "只写实体ID，例如：minecraft:zombie",
+                            "注意：这不会阻止该生物自然生成，只是不再由本模组的刷怪逻辑选用")
+                    .defineList("exclude", List.of(), o -> o instanceof String);
             builder.pop();
-
             builder.push("conversion");
             enableConversion = builder.comment("是否启用转化系统").define("enableConversion", true);
             conversionSmallMaxHp = builder.comment("小生物池的最大生命值（< 此值）").defineInRange("smallMaxHp", 50.0, 1.0, 1000.0);
@@ -382,12 +362,57 @@ public class Config {
 
             builder.push("adaptation");
             enableAdaptation = builder.comment("启用适应性系统").define("enableAdaptation", true);
-            reductionPerHit = builder.comment("每次受击增加的减伤比例（例如 0.05 = 5%）")
-                    .defineInRange("reductionPerHit", 0.05, 0.0, 1.0);
-            baseImmunity = builder.comment("各生物等级（0=SMALL,1=MEDIUM,2=LARGE,3=BOSS）在阶段0时的基础减伤上限")
-                    .defineList("baseImmunity", List.of(0.05, 0.10, 0.15, 0.20), o -> o instanceof Double);
-            finalMaxReduction = builder.comment("各生物等级在最大演化阶段时的最终减伤上限")
-                    .defineList("finalMaxReduction", List.of(0.70, 0.85, 0.95, 1.00), o -> o instanceof Double);
+            adaptationTiers = builder
+                    .comment("各生物等级的适应参数：等级:产生概率:每次减免:最大次数:是否免疫",
+                            "等级：0=small(BasicInfected) 1=medium(EvolvedInfected) 2=large(Hyper/Experiment) 3=boss(Calamity)",
+                            "默认参照 SRP：medium≈原始种(70%/5%/12次/60%)、large≈纯粹种(95%/12.5%/8次/免疫)、boss≈卓越种(100%/20%/5次/免疫)",
+                            "small 在 SRP 里本不产生适应，这里给了较弱的一组(40%/3%/10次)，可按需调整")
+                    .defineList("tiers", List.of(
+                            "0:0.40:0.03:10:false",
+                            "1:0.70:0.05:12:false",
+                            "2:0.95:0.125:8:true",
+                            "3:1.00:0.20:5:true"
+                    ), o -> o instanceof String);
+            adaptationMaxTypes = builder
+                    .comment("各等级可适应的来源类型数上限（阶段0），随演化阶段增长",
+                            "对应 mcmod 表1：原始种 5、纯粹种 12、卓越种 20；small 给 3")
+                    .defineList("maxAdaptedTypes", List.of(3, 5, 12, 20), o -> o instanceof Integer);
+            adaptationPhaseGrowth = builder
+                    .comment("随演化阶段增强的系数：每阶段 +此值（0.03 → 阶段10 = ×1.30）",
+                            "作用于产生概率、每次减免、可适应类型数上限；次数上限不变，所以总减伤随阶段提高")
+                    .defineInRange("phaseGrowthPerStage", 0.03, 0.0, 0.2);
+            adaptationMaxTotalReduction = builder
+                    .comment("非免疫等级的减伤总上限。1.0 = 允许靠累积次数达到完全免伤",
+                            "标记为 immune 的等级（tiers 第 5 段为 true）在达到次数上限后直接免疫，不受此值影响")
+                    .defineInRange("maxTotalReduction", 1.0, 0.0, 1.0);            builder.pop();
+
+            // ==================== 伤害适应的视觉反馈 ====================
+            builder.push("adaptation_visual");
+            adaptationVisualEnabled = builder
+                    .comment("启用伤害适应的视觉反馈（原版 SRP 的绿光/紫光）")
+                    .define("enabled", true);
+
+            adaptationFlashDurationTicks = builder
+                    .comment("闪光持续 tick（默认 10，与原版受击红闪等长）")
+                    .defineInRange("flashDurationTicks", 10, 1, 40);
+            adaptationAdaptingColor = builder
+                    .comment("产生适应时的体色（R:G:B，0..1）")
+                    .define("adaptingColor", "0.25:1.0:0.35");
+            adaptationFullColor = builder
+                    .comment("完全适应时的体色（R:G:B，0..1）")
+                    .define("fullColor", "0.72:0.30:1.0");
+            adaptationFlashAlpha = builder
+                    .comment("体色不透明度，1.0 为不透明；低于 1 会让实体整体半透明，一般保持 1.0")
+                    .defineInRange("flashAlpha", 1.0, 0.1, 1.0);
+            adaptationFlashParticles = builder
+                    .comment("产生适应时是否喷红色星形粒子")
+                    .define("particles", true);
+            adaptationFlashParticleCount = builder
+                    .comment("粒子数量")
+                    .defineInRange("particleCount", 8, 0, 40);
+            adaptationFullSound = builder
+                    .comment("完全适应时是否播放金属敲击音效")
+                    .define("fullSound", true);
             builder.pop();
 
             builder.push("support");
@@ -401,6 +426,20 @@ public class Config {
             supportSecondLowerChance = builder.comment("召唤第二只下一级生物的概率").defineInRange("supportSecondLowerChance", 0.3, 0.0, 1.0);
             supportScentChance = builder.comment("召唤支援孢气的概率").defineInRange("supportScentChance", 0.2, 0.0, 1.0);
             supportCooldownSeconds = builder.comment("每次触发支援后的冷却时间（秒）").defineInRange("supportCooldownSeconds", 25, 0, 300);
+
+            // ---- 召唤物：抛出效果与生命周期 ----
+            supportThrowHorizontal = builder
+                    .comment("召唤时水平方向的推力（格/tick），配合 360° 随机方向")
+                    .defineInRange("throwHorizontal", 0.25, 0.0, 2.0);
+            supportThrowUpward = builder
+                    .comment("召唤时向上的推力（格/tick），模拟被抛出")
+                    .defineInRange("throwUpward", 0.42, 0.0, 2.0);
+            supportSummonedNoAggroSeconds = builder
+                    .comment("召唤物「没有仇恨」多少秒后消失")
+                    .defineInRange("summonedNoAggroSeconds", 10, 1, 600);
+            supportSummonedLifetimeSeconds = builder
+                    .comment("召唤物最长存在多少秒（不论是否有仇恨）")
+                    .defineInRange("summonedLifetimeSeconds", 100, 1, 3600);
             supportMinSpawnDistance = builder.comment("召唤援军的最小距离（格）").defineInRange("supportMinSpawnDistance", 10.0, 0.0, 50.0);
             supportMaxSpawnDistance = builder.comment("召唤援军的最大距离（格）").defineInRange("supportMaxSpawnDistance", 15.0, 1.0, 100.0);
             builder.pop();
@@ -895,6 +934,63 @@ public class Config {
             decoyProvokeProto = builder
                     .comment("世界存在 Proto 时，饵堆必定让其中一只注意到玩家")
                     .define("forceProtoAggro", true);
+            builder.pop();
+
+            // ==================== 环境效果（纯客户端） ====================
+            builder.push("environment");
+            environmentEnabled = builder
+                    .comment("总开关：阶段环境效果（迷雾 / 雾色 / 孢子粒子）")
+                    .define("enabled", true);
+            environmentFogEnabled = builder
+                    .comment("启用迷雾距离与雾色（仅影响客户端渲染）")
+                    .define("fogEnabled", true);
+            environmentFogNearByPhase = builder
+                    .comment("各阶段的雾起点（格），索引 = 演化阶段；配合 fogFarByPhase 使用")
+                    .defineList("fogNearByPhase",
+                            List.of(0.0, 0.0, 0.0, 0.0, 0.0, 4.0, 8.0, 12.0, 16.0, 20.0, 24.0),
+                            o -> o instanceof Double);
+            environmentFogFarByPhase = builder
+                    .comment("各阶段的雾终点（格）。0 = 该阶段保持原版雾，便于让低阶段完全不受影响")
+                    .defineList("fogFarByPhase",
+                            List.of(0.0, 0.0, 0.0, 0.0, 256.0, 208.0, 160.0, 128.0, 96.0, 72.0, 48.0),
+                            o -> o instanceof Double);
+            environmentFogTintByPhase = builder
+                    .comment("各阶段雾色向 tintR/G/B 混合的强度（0 = 原色，1 = 完全变成目标色）")
+                    .defineList("fogTintByPhase",
+                            List.of(0.0, 0.0, 0.0, 0.05, 0.10, 0.18, 0.32, 0.45, 0.60, 0.78, 1.0),
+                            o -> o instanceof Double);
+            environmentFogTintRed = builder
+                    .comment("雾色目标 R（0..1）")
+                    .defineInRange("fogTintRed", 0.55, 0.0, 1.0);
+            environmentFogTintGreen = builder
+                    .comment("雾色目标 G（0..1）")
+                    .defineInRange("fogTintGreen", 0.10, 0.0, 1.0);
+            environmentFogTintBlue = builder
+                    .comment("雾色目标 B（0..1）")
+                    .defineInRange("fogTintBlue", 0.08, 0.0, 1.0);
+            environmentParticlesEnabled = builder
+                    .comment("阶段达到 particlePhase 后，玩家周围是否飘散孢子粒子")
+                    .define("particlesEnabled", true);
+            environmentParticlePhase = builder
+                    .comment("从该阶段起出现孢子粒子（默认 6）")
+                    .defineInRange("particlePhase", 6, 0, 10);
+
+            // ---- 群系浓雾：进入孢子感染群系时强制浓雾 ----
+            environmentBiomeFogEnabled = builder
+                    .comment("进入孢子感染群系（sporesrp:infected_biome）时是否强制浓雾")
+                    .define("biomeFog", true);
+            environmentBiomeFogNear = builder
+                    .comment("群系内雾起点（格）")
+                    .defineInRange("biomeFogNear", 2.0, 0.0, 256.0);
+            environmentBiomeFogFar = builder
+                    .comment("群系内雾终点（格）：越小能见度越低")
+                    .defineInRange("biomeFogFar", 48.0, 8.0, 512.0);
+            environmentBiomeFogTint = builder
+                    .comment("群系内雾色向暗红混合的强度（0 = 不染色，1 = 完全暗红）")
+                    .defineInRange("biomeFogTint", 0.85, 0.0, 1.0);
+            environmentParticlesPerSecond = builder
+                    .comment("孢子粒子密度（个/秒，默认 6）")
+                    .defineInRange("particlesPerSecond", 6.0, 0.0, 60.0);
             builder.pop();
 
             // ==================== CDU 净化 ====================

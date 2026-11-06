@@ -10,6 +10,7 @@ import com.maha_fish.sporesrp.enchantment.ModEnchantments;
 import com.maha_fish.sporesrp.handler.*;
 import com.maha_fish.sporesrp.item.ModCreativeTabs;
 import com.maha_fish.sporesrp.item.ModItems;
+import com.maha_fish.sporesrp.network.AdaptationFlashPacket;
 import com.maha_fish.sporesrp.network.SyncEvolutionDataPacket;
 import com.maha_fish.sporesrp.network.ToggleHUDPacket;
 import com.maha_fish.sporesrp.phase.PhaseEffects;
@@ -166,7 +167,10 @@ public class SporeSRP {
         CHANNEL.registerMessage(id++, ToggleHUDPacket.class,
                 ToggleHUDPacket::encode,
                 ToggleHUDPacket::new,
-                ToggleHUDPacket::handle);
+                ToggleHUDPacket::handle);        CHANNEL.registerMessage(id++, AdaptationFlashPacket.class,
+                AdaptationFlashPacket::encode,
+                AdaptationFlashPacket::new,
+                AdaptationFlashPacket::handle);
     }
 
     // ========== 事件监听 ==========

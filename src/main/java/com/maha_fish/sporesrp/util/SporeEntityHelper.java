@@ -1,13 +1,12 @@
 package com.maha_fish.sporesrp.util;
 
-import com.maha_fish.sporesrp.Config;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
 
+import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -15,14 +14,11 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * Spore 生物识别工具。
  *
- * <p>性能说明：注册表查询（{@code BuiltInRegistries.ENTITY_TYPE.getKey}）与
- * 配置列表的 {@code List.contains} 原本在每次调用时都会执行，而调用点大量位于
- * 每 tick 循环和实体扫描谓词中。这里对二者做**结果缓存**：
- * <ul>
- *   <li>实体类型 -> 注册名：注册表在冻结后不可变，因此可永久缓存；</li>
- *   <li>配置列表 -> HashSet：以列表实例做失效判断，配置重载后实例变化会自动重建。</li>
- * </ul>
- * 缓存只改变查询方式，不改变任何判定结果，因此不影响游戏内表现。
+ * <p>刷怪池**不再由配置名单维护**，而是由 {@link SporeTierHelper} 按 Spore 的继承体系推导，
+ * 因此 Spore 新增生物会自动归位，不需要改配置。
+ *
+ * <p>性能：注册表查询（{@code BuiltInRegistries.ENTITY_TYPE.getKey}）结果按 EntityType 永久缓存；
+ * 刷怪池快照由 {@link SporeTierHelper} 缓存，仅在等级标注配置变化时重建。
  */
 public final class SporeEntityHelper {
 
@@ -30,9 +26,9 @@ public final class SporeEntityHelper {
     }
 
     /** spore 命名空间下的固定实体 ID，避免重复构造 ResourceLocation。 */
-    private static final ResourceLocation PROTO_ID = new ResourceLocation("spore", "proto");
-    private static final ResourceLocation MOUND_ID = new ResourceLocation("spore", "mound");
-    private static final ResourceLocation SCENT_ID = new ResourceLocation("spore", "scent");
+    private static final ResourceLocation PROTO_ID = ResourceLocation.tryParse("spore:proto");
+    private static final ResourceLocation MOUND_ID = ResourceLocation.tryParse("spore:mound");
+    private static final ResourceLocation SCENT_ID = ResourceLocation.tryParse("spore:scent");
 
     private static final String SPORE_NAMESPACE = "spore";
 
@@ -43,50 +39,24 @@ public final class SporeEntityHelper {
     private static final ConcurrentHashMap<EntityType<?>, ResourceLocation> ID_CACHE =
             new ConcurrentHashMap<>();
 
-    // ==================== 配置列表的集合视图（按列表实例失效） ====================
+    // ==================== 各等级刷怪池（按 Spore 继承体系推导） ====================
 
-    private static final PoolView SMALL = new PoolView();
-    private static final PoolView MEDIUM = new PoolView();
-    private static final PoolView LARGE = new PoolView();
-    private static final PoolView BOSS = new PoolView();
-    private static final PoolView ORGANOIDS = new PoolView();
+    /** 小等级生物池（BasicInfected 等）。含 "spore:" 前缀。 */
+    public static Set<String> smallPoolSet() { return SporeTierHelper.poolSnapshot().pool(SporeTierHelper.Tier.SMALL); }
+    /** 中等级生物池（EvolvedInfected + 标注为 medium 的类器官与无等级生物）。 */
+    public static Set<String> mediumPoolSet() { return SporeTierHelper.poolSnapshot().pool(SporeTierHelper.Tier.MEDIUM); }
+    /** 大等级生物池（Hyper / Experiment + 标注为 large 的类器官）。 */
+    public static Set<String> largePoolSet() { return SporeTierHelper.poolSnapshot().pool(SporeTierHelper.Tier.LARGE); }
+    /** Boss 生物池（Calamity）。 */
+    public static Set<String> bossPoolSet() { return SporeTierHelper.poolSnapshot().pool(SporeTierHelper.Tier.BOSS); }
+    /** 类器官集合（Organoid 基类的全部子类）。 */
+    public static Set<String> organoidSet() { return SporeTierHelper.poolSnapshot().organoids(); }
 
-    private static final class PoolView {
-        private List<? extends String> source;
-        private Set<String> view = Collections.emptySet();
-
-        Set<String> of(List<? extends String> list) {
-            if (list == this.source) return this.view;
-            // 同一个配置项可能每次 get() 都返回新的 List 实例：此时先比较内容，
-            // 内容相同只换引用、不重建 HashSet，避免缓存反而变成每调用一次就重建。
-            if (list != null && this.source != null && list.equals(this.source)) {
-                this.source = list;
-                return this.view;
-            }
-            this.source = list;
-            this.view = (list == null || list.isEmpty())
-                    ? Collections.emptySet()
-                    : Collections.unmodifiableSet(new HashSet<>(list));
-            return this.view;
-        }
-    }
-
-    public static List<? extends String> getSmallPool() { return Config.COMMON.poolSmall.get(); }
-    public static List<? extends String> getMediumPool() { return Config.COMMON.poolMedium.get(); }
-    public static List<? extends String> getLargePool() { return Config.COMMON.poolLarge.get(); }
-    public static List<? extends String> getBossPool() { return Config.COMMON.poolBoss.get(); }
-    public static List<? extends String> getOrganoids() { return Config.COMMON.organoids.get(); }
-
-    /** 缓存版小生物池（O(1) 查询）。 */
-    public static Set<String> smallPoolSet() { return SMALL.of(getSmallPool()); }
-    /** 缓存版中生物池（O(1) 查询）。 */
-    public static Set<String> mediumPoolSet() { return MEDIUM.of(getMediumPool()); }
-    /** 缓存版大生物池（O(1) 查询）。 */
-    public static Set<String> largePoolSet() { return LARGE.of(getLargePool()); }
-    /** 缓存版 Boss 生物池（O(1) 查询）。 */
-    public static Set<String> bossPoolSet() { return BOSS.of(getBossPool()); }
-    /** 缓存版类器官体列表（O(1) 查询）。 */
-    public static Set<String> organoidSet() { return ORGANOIDS.of(getOrganoids()); }
+    public static List<String> getSmallPool() { return new ArrayList<>(smallPoolSet()); }
+    public static List<String> getMediumPool() { return new ArrayList<>(mediumPoolSet()); }
+    public static List<String> getLargePool() { return new ArrayList<>(largePoolSet()); }
+    public static List<String> getBossPool() { return new ArrayList<>(bossPoolSet()); }
+    public static List<String> getOrganoids() { return new ArrayList<>(organoidSet()); }
 
     // ==================== 注册名查询（带缓存） ====================
 
@@ -164,27 +134,25 @@ public final class SporeEntityHelper {
         return entity != null && SCENT_ID.equals(getEntityId(entity.getType()));
     }
 
-    // ★判断是否为 LargePool
+    /** 是否为 Large 等级（类器官 proto 虽在 large 池，但不算 Large 级生物）。 */
     public static boolean isLargePool(LivingEntity entity) {
         ResourceLocation id = getEntityId(entity);
         if (id == null) return false;
-        // Proto 不是 LargePool
         if (PROTO_ID.equals(id)) return false;
         return largePoolSet().contains(id.toString());
     }
 
-    // ★判断是否为 Boss
+    /** 是否为 Boss 等级。 */
     public static boolean isBoss(LivingEntity entity) {
         ResourceLocation id = getEntityId(entity);
         if (id == null) return false;
         return bossPoolSet().contains(id.toString());
     }
 
+    /** 0 = 小，1 = 中，2 = 大，3 = Boss；未知返回 0。 */
     public static int getInfectedLevel(LivingEntity entity) {
         ResourceLocation regName = getEntityId(entity);
         if (regName == null) return 0;
-        // 原始实现还检查了 registry.containsKey(regName)：由 getKey 反查得到的 ID
-        // 必然存在于注册表中，该检查恒为真，故省略（结果不变）。
         String id = regName.toString();
 
         if (smallPoolSet().contains(id)) return 0;
@@ -192,5 +160,10 @@ public final class SporeEntityHelper {
         if (largePoolSet().contains(id)) return 2;
         if (bossPoolSet().contains(id)) return 3;
         return 0;
+    }
+
+    /** 空列表常量，供调用方在无 Spore 时复用。 */
+    public static List<String> emptyPool() {
+        return Collections.emptyList();
     }
 }

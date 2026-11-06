@@ -2,6 +2,7 @@ package com.maha_fish.sporesrp.handler;
 
 import com.maha_fish.sporesrp.Config;
 import com.maha_fish.sporesrp.SporeSRP;
+import com.maha_fish.sporesrp.util.SporeSpawnHelper;
 import com.maha_fish.sporesrp.util.SporeEntityCache;
 import net.minecraft.commands.CommandSource;
 import net.minecraft.commands.CommandSourceStack;
@@ -188,10 +189,7 @@ public class ProtoSkillsHandler {
     // ==================== 实体生成（保育体使用命令，其他直接创建） ====================
     private static void spawnEntity(ServerLevel level, BlockPos pos, EntityType<?> type) {
         if (type == null) return;
-        LivingEntity entity = (LivingEntity) type.create(level);
-        if (entity == null) return;
-        entity.setPos(pos.getX() + 0.5, pos.getY(), pos.getZ() + 0.5);
-        level.addFreshEntity(entity);
+        SporeSpawnHelper.spawnFinalized(level, type, pos);
     }
 
     // 保育体：使用命令生成

@@ -2,31 +2,26 @@ package com.maha_fish.sporesrp.handler;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.InteractionHand;
-import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraftforge.event.entity.player.PlayerInteractEvent;
 import net.minecraftforge.event.level.BlockEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 
+/**
+ * {@code spore:cdu} 方块的辅助事件。
+ *
+ * <p>群系净化现在由 {@link CDUCommandHandler} **跟随 CDU 方块自身的燃料脉冲**完成，
+ * 不再需要玩家用冰罐右击来启动，因此这里只保留"方块被破坏时停止跟踪"。
+ */
 public class CDUHandler {
 
-    private static final ResourceLocation CDU_BLOCK_ID = new ResourceLocation("spore", "cdu");
+    private static final ResourceLocation CDU_BLOCK_ID = ResourceLocation.tryParse("spore:cdu");
 
-    /**
-     * {@code spore:cdu} 方块实例的惰性缓存。
-     *
-     * <p>原实现在每次右键 / 破坏时都做 {@code BuiltInRegistries.BLOCK.getKey(...).toString()}
-     * 再与字符串比较。方块注册表在注册完成后不再变化，因此把目标方块解析一次后直接做
-     * 引用比较即可，判定结果完全相同（未安装 Spore 时始终不匹配）。
-     */
+    /** {@code spore:cdu} 方块实例的惰性缓存（注册表冻结后不再变化）。 */
     private static Block cduBlock;
 
     private static Block getCduBlock() {
@@ -38,30 +33,6 @@ public class CDUHandler {
             }
         }
         return cduBlock;
-    }
-
-    @SubscribeEvent
-    public void onRightClickBlock(PlayerInteractEvent.RightClickBlock event) {
-        Entity entity = event.getEntity();
-        if (!(entity instanceof Player)) return;
-        Player player = (Player) entity;
-        Level level = player.level();
-        if (level.isClientSide()) return;
-
-        BlockPos pos = event.getPos();
-        BlockState state = level.getBlockState(pos);
-        Block targetCdu = getCduBlock();
-        if (targetCdu == null || state.getBlock() != targetCdu) return;
-
-        ItemStack held = player.getItemInHand(InteractionHand.MAIN_HAND);
-        if (held.isEmpty()) return;
-        String itemId = BuiltInRegistries.ITEM.getKey(held.getItem()).toString();
-        if (!"spore:ice_canister".equals(itemId)) return;
-
-        if (level instanceof ServerLevel serverLevel) {
-            CDUCommandHandler.startPurification(serverLevel, pos);
-            player.sendSystemMessage(Component.translatable("sporesrp.cdu.purification.start"));
-        }
     }
 
     @SubscribeEvent

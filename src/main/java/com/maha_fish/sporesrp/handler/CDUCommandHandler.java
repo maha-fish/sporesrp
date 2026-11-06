@@ -3,73 +3,105 @@ package com.maha_fish.sporesrp.handler;
 import com.maha_fish.sporesrp.Config;
 import com.maha_fish.sporesrp.SporeSRP;
 import com.maha_fish.sporesrp.util.BiomeRegionConverter;
-import net.minecraft.core.Holder;
-import net.minecraft.core.registries.Registries;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.level.biome.Biome;
-import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.entity.BlockEntityType;
+import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 
-import java.util.Iterator;
+import java.lang.reflect.Method;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * 管理 CDU 方块的净化任务，支持多维度
+ * CDU 的群系净化 —— **绑定在原模组的 CDU 方块上**，不是自建倒计时。
+ *
+ * <p>原模组 {@code CDUBlockEntity.serverTick} 的逻辑（反编译确认）：
+ * <pre>
+ *   if (CDUBlock.isCDUUsable(pos, level) &amp;&amp; e.getFuel() &gt; 0) {
+ *       e.fuel--;
+ *       if (e.getFuel() % 200 == 0) e.cleanInfection(pos);   // 每 200 tick 净化一次方块
+ *   }
+ * </pre>
+ * 也就是说 CDU 每消耗 200 点燃料就净化一波。这里完全跟随它：
+ * 读取同一个 {@code fuel}，在 {@code fuel % 200 == 0} 的那一 tick 顺带把周围群系改回平原。
+ *
+ * <p>好处：
+ * <ul>
+ *   <li>没有燃料就不会净化（以前是自己数 60 秒，与方块状态无关）；</li>
+ *   <li>净化节奏与方块本身完全一致，不会出现"方块停了群系还在变"；</li>
+ *   <li>不再需要玩家拿冰罐右击来启动。</li>
+ * </ul>
  */
 public class CDUCommandHandler {
 
-    private static final int DURATION_TICKS = 60 * 20; // 60 seconds
-    private static final int CLEAR_INTERVAL = 5 * 20;  // 5 seconds
+    /** 原模组 CDU 的方块实体注册名。 */
+    private static final ResourceLocation CDU_BLOCK_ENTITY_ID = ResourceLocation.tryParse("spore:cdu");
+    /** 原模组的净化脉冲间隔（tick），与其 {@code fuel % 200 == 0} 对齐。 */
+    private static final int PULSE_TICKS = 200;
+    /** 发现 CDU 的扫描间隔（tick）。 */
+    private static final int DISCOVERY_INTERVAL = 100;
+    /** 扫描玩家周围多少区块。 */
+    private static final int DISCOVERY_CHUNK_RADIUS = 3;
 
-    // 维度 -> (方块位置 -> 净化数据)
-    private static final Map<ResourceKey<Level>, Map<BlockPos, PurificationData>> ACTIVE_CDUS = new ConcurrentHashMap<>();
-    private static final java.util.concurrent.ConcurrentLinkedQueue<Runnable> COMMAND_QUEUE = new java.util.concurrent.ConcurrentLinkedQueue<>();
     private static final int MAX_COMMANDS_PER_TICK = 20;
+
+    /** 维度 -> 已发现的 CDU 位置 -> 上次读到的燃料值。 */
+    private static final Map<ResourceKey<Level>, Map<BlockPos, Integer>> KNOWN_CDUS = new ConcurrentHashMap<>();
+    /** 待处理的群系转换任务。 */
+    private static final java.util.concurrent.ConcurrentLinkedQueue<Runnable> COMMAND_QUEUE = new java.util.concurrent.ConcurrentLinkedQueue<>();
     /** 本 tick 有群系改动的区块，攒起来统一下发。 */
     private static final java.util.List<LevelChunk> PENDING_CLEAR_CHUNKS = new java.util.ArrayList<>();
 
-    private static class PurificationData {
-        int totalRemaining;
-        int cooldown;
+    private static Method getFuelMethod;
+    private static boolean getFuelResolved;
+    private static final Map<BlockEntityType<?>, Boolean> CDU_TYPE_CACHE = new ConcurrentHashMap<>();
+    private static int discoveryTimer;
 
-        PurificationData() {
-            this.totalRemaining = DURATION_TICKS;
-            this.cooldown = 0;
-        }
+    // ==================== 反射读取原模组 CDU 的燃料 ====================
 
-        void tick() {
-            if (totalRemaining > 0) {
-                totalRemaining--;
-                if (cooldown > 0) {
-                    cooldown--;
-                }
+    private static int readFuel(BlockEntity blockEntity) {
+        if (!getFuelResolved) {
+            getFuelResolved = true;
+            try {
+                getFuelMethod = blockEntity.getClass().getMethod("getFuel");
+            } catch (NoSuchMethodException e) {
+                getFuelMethod = null;
             }
         }
-
-        boolean shouldClear() {
-            return totalRemaining > 0 && cooldown == 0;
-        }
-
-        void resetCooldown() {
-            cooldown = CLEAR_INTERVAL;
-        }
-
-        boolean isExpired() {
-            return totalRemaining <= 0;
+        if (getFuelMethod == null) return -1;
+        try {
+            Object value = getFuelMethod.invoke(blockEntity);
+            return value instanceof Integer fuel ? fuel : -1;
+        } catch (Throwable t) {
+            return -1;
         }
     }
 
-    private static Map<BlockPos, PurificationData> getDimensionMap(ResourceKey<Level> dimension) {
-        return ACTIVE_CDUS.computeIfAbsent(dimension, k -> new ConcurrentHashMap<>());
+    private static boolean isCdu(BlockEntity blockEntity) {
+        if (blockEntity == null) return false;
+        BlockEntityType<?> type = blockEntity.getType();
+        Boolean cached = CDU_TYPE_CACHE.get(type);
+        if (cached != null) return cached;
+        ResourceLocation id = BuiltInRegistries.BLOCK_ENTITY_TYPE.getKey(type);
+        boolean match = id != null && CDU_BLOCK_ENTITY_ID.equals(id);
+        CDU_TYPE_CACHE.put(type, match);
+        return match;
     }
 
-    // ========== 提交清除任务 ==========
+    // ==================== 群系净化 ====================
+
     /** 目标群系 / 只清理的来源群系；均为注册表 holder，比较用引用相等。 */
     private static Holder<Biome> holder(ServerLevel level, ResourceLocation id) {
         return level.registryAccess()
@@ -80,8 +112,8 @@ public class CDUCommandHandler {
     /**
      * 把 CDU 周围的感染群系改回平原。
      *
-     * <p>不再逐方块 {@code fillbiome}，而是按区块直写 biome palette，
-     * 且**只替换当前确实是感染群系的格子** —— 原生群系（沙漠、针叶林等）不会被一并抹成平原。
+     * <p>按区块直写 biome palette，且**只替换当前确实是感染群系的格子** ——
+     * 原生群系（沙漠、针叶林等）不会被一并抹成平原。
      */
     private static void submitClearCommand(ServerLevel level, BlockPos pos) {
         int radius = Config.COMMON.cduPurifyRadius.get();
@@ -94,8 +126,8 @@ public class CDUCommandHandler {
         int minY = Math.max(level.getMinBuildHeight(), pos.getY() - halfHeight);
         int maxY = Math.min(level.getMaxBuildHeight() - 1, pos.getY() + halfHeight);
 
-        Holder<Biome> target = holder(level, new ResourceLocation("minecraft", "plains"));
-        Holder<Biome> infected = holder(level, new ResourceLocation(SporeSRP.MOD_ID, "infected_biome"));
+        Holder<Biome> target = holder(level, ResourceLocation.tryParse("minecraft:plains"));
+        Holder<Biome> infected = holder(level, ResourceLocation.tryParse(SporeSRP.MOD_ID + ":infected_biome"));
 
         int minCX = minX >> 4, maxCX = maxX >> 4;
         int minCZ = minZ >> 4, maxCZ = maxZ >> 4;
@@ -110,39 +142,44 @@ public class CDUCommandHandler {
             }
         }
     }
-    // ========== 对外 API ==========
-    public static void startPurification(ServerLevel level, BlockPos pos) {
-        ResourceKey<Level> dim = level.dimension();
-        Map<BlockPos, PurificationData> map = getDimensionMap(dim);
-        PurificationData data = map.get(pos);
-        if (data == null) {
-            data = new PurificationData();
-            map.put(pos.immutable(), data);
-        } else {
-            data.totalRemaining = DURATION_TICKS;
-            data.cooldown = 0;
+
+    /** CDU 被破坏时停止跟踪。 */
+    public static void stopPurification(ServerLevel level, BlockPos pos) {
+        Map<BlockPos, Integer> map = KNOWN_CDUS.get(level.dimension());
+        if (map != null) {
+            map.remove(pos);
+            if (map.isEmpty()) KNOWN_CDUS.remove(level.dimension());
         }
-        SporeSRP.LOGGER.debug("CDU purification started/reset at {} in {}", pos, dim);
     }
 
-    public static void stopPurification(ServerLevel level, BlockPos pos) {
-        ResourceKey<Level> dim = level.dimension();
-        Map<BlockPos, PurificationData> map = ACTIVE_CDUS.get(dim);
-        if (map != null) {
-            map.remove(pos.immutable());
-            if (map.isEmpty()) {
-                ACTIVE_CDUS.remove(dim);
+    // ==================== 发现 CDU ====================
+
+    private static void discoverCdus(ServerLevel level) {
+        Map<BlockPos, Integer> known = KNOWN_CDUS.computeIfAbsent(level.dimension(), k -> new ConcurrentHashMap<>());
+
+        for (ServerPlayer player : level.players()) {
+            int pcx = player.chunkPosition().x;
+            int pcz = player.chunkPosition().z;
+            for (int dx = -DISCOVERY_CHUNK_RADIUS; dx <= DISCOVERY_CHUNK_RADIUS; dx++) {
+                for (int dz = -DISCOVERY_CHUNK_RADIUS; dz <= DISCOVERY_CHUNK_RADIUS; dz++) {
+                    LevelChunk chunk = level.getChunkSource().getChunkNow(pcx + dx, pcz + dz);
+                    if (chunk == null) continue;
+                    for (BlockEntity blockEntity : chunk.getBlockEntities().values()) {
+                        if (!isCdu(blockEntity)) continue;
+                        known.putIfAbsent(blockEntity.getBlockPos(), -1);
+                    }
+                }
             }
         }
-        SporeSRP.LOGGER.debug("CDU purification stopped at {} in {}", pos, dim);
     }
 
-    // ========== ServerTick 处理 ==========
+    // ==================== ServerTick 处理 ====================
+
     @SubscribeEvent
     public void onServerTick(TickEvent.ServerTickEvent event) {
         if (event.phase != TickEvent.Phase.END) return;
 
-        // 处理命令队列
+        // 1) 处理群系转换队列
         int executed = 0;
         while (!COMMAND_QUEUE.isEmpty() && executed < MAX_COMMANDS_PER_TICK) {
             try {
@@ -153,7 +190,7 @@ public class CDUCommandHandler {
             }
         }
 
-        // 本 tick 改动过的区块合并成一个群系包发出
+        // 2) 本 tick 改动过的区块合并成一个群系包发出
         if (!PENDING_CLEAR_CHUNKS.isEmpty()) {
             try {
                 BiomeRegionConverter.sendBiomePacket(PENDING_CLEAR_CHUNKS);
@@ -164,46 +201,37 @@ public class CDUCommandHandler {
             }
         }
 
-        // 遍历所有维度
-        Iterator<Map.Entry<ResourceKey<Level>, Map<BlockPos, PurificationData>>> dimIt = ACTIVE_CDUS.entrySet().iterator();
-        while (dimIt.hasNext()) {
-            Map.Entry<ResourceKey<Level>, Map<BlockPos, PurificationData>> dimEntry = dimIt.next();
-            ResourceKey<Level> dimKey = dimEntry.getKey();
-            Map<BlockPos, PurificationData> map = dimEntry.getValue();
-
-            // 尝试获取该维度的 ServerLevel
-            ServerLevel level = event.getServer().getLevel(dimKey);
-            if (level == null) {
-                // 维度未加载，跳过此维度（数据保留，等加载后再处理）
-                continue;
-            }
-
-            Iterator<Map.Entry<BlockPos, PurificationData>> it = map.entrySet().iterator();
-            while (it.hasNext()) {
-                Map.Entry<BlockPos, PurificationData> entry = it.next();
-                BlockPos pos = entry.getKey();
-                PurificationData data = entry.getValue();
-
-                data.tick();
-
-                if (data.isExpired()) {
-                    it.remove();
-                    SporeSRP.LOGGER.debug("CDU purification expired at {} in {}", pos, dimKey);
-                    continue;
-                }
-
-                if (data.shouldClear()) {
-                    // 执行清除
-                    submitClearCommand(level, pos);
-                    data.resetCooldown();
-                    SporeSRP.LOGGER.debug("CDU clear executed at {} in {}", pos, dimKey);
-                }
-            }
-
-            // 如果该维度 map 为空，移除维度条目
-            if (map.isEmpty()) {
-                dimIt.remove();
+        // 3) 定期发现附近的 CDU
+        if (++discoveryTimer >= DISCOVERY_INTERVAL) {
+            discoveryTimer = 0;
+            for (ServerLevel level : event.getServer().getAllLevels()) {
+                if (!level.players().isEmpty()) discoverCdus(level);
             }
         }
+
+        // 4) 跟随原模组 CDU 的净化脉冲
+        KNOWN_CDUS.forEach((dimension, positions) -> {
+            if (positions.isEmpty()) return;
+            ServerLevel level = event.getServer().getLevel(dimension);
+            if (level == null) return;
+
+            positions.entrySet().removeIf(entry -> {
+                BlockEntity blockEntity = level.getBlockEntity(entry.getKey());
+                if (!isCdu(blockEntity)) return true; // 方块不在了，停止跟踪
+
+                int fuel = readFuel(blockEntity);
+                if (fuel < 0) return false;
+
+                int lastFuel = entry.getValue();
+                entry.setValue(fuel);
+
+                // 与原模组 cleanInfection 同一个判定：fuel % 200 == 0 且燃料确实在下降
+                if (fuel > 0 && fuel % PULSE_TICKS == 0 && fuel != lastFuel) {
+                    submitClearCommand(level, entry.getKey());
+                    SporeSRP.LOGGER.debug("CDU pulse at {} (fuel={}): purifying biome", entry.getKey(), fuel);
+                }
+                return false;
+            });
+        });
     }
 }

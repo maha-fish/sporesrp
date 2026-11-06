@@ -2,6 +2,7 @@ package com.maha_fish.sporesrp.handler;
 
 import com.maha_fish.sporesrp.Config;
 import com.maha_fish.sporesrp.SporeSRP;
+import com.maha_fish.sporesrp.util.SporeSpawnHelper;
 import com.maha_fish.sporesrp.data.WorldEvolutionData;
 import com.maha_fish.sporesrp.util.EntityRemoval;
 import com.maha_fish.sporesrp.phase.PhaseEffects;
@@ -74,10 +75,11 @@ public class InfectionConversionHandler {
             return false;
         }
 
-        LivingEntity newMob = (LivingEntity) spawnType.create(serverLevel);
+        // 走 finalizeSpawn：Infected 的 setDefaultLinkage / spawnWithPoints 在那里，
+        // 直接 addFreshEntity 会得到未链接蜂巢、且没有初始点数的生物
+        LivingEntity newMob = SporeSpawnHelper.spawnFinalized(serverLevel, spawnType,
+                victim.getX(), victim.getY(), victim.getZ());
         if (newMob == null) return false;
-        newMob.setPos(victim.getX(), victim.getY(), victim.getZ());
-        serverLevel.addFreshEntity(newMob);
 
         List<? extends Double> multipliers = Config.COMMON.phasePointMultipliers.get();
         double phaseMultiplier = (phase < multipliers.size()) ? multipliers.get(phase) : 1.0;

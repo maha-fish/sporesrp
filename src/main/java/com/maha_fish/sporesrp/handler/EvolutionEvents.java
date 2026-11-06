@@ -108,10 +108,10 @@ public class EvolutionEvents {
         if (id == null) return "unknown";
         String name = id.toString();
         if ("spore:proto".equals(name)) return "proto";
-        if (SporeEntityHelper.getSmallPool().contains(name)) return "small";
-        if (SporeEntityHelper.getMediumPool().contains(name)) return "medium";
-        if (SporeEntityHelper.getLargePool().contains(name)) return "large";
-        if (SporeEntityHelper.getBossPool().contains(name)) return "boss";
+        if (SporeEntityHelper.smallPoolSet().contains(name)) return "small";
+        if (SporeEntityHelper.mediumPoolSet().contains(name)) return "medium";
+        if (SporeEntityHelper.largePoolSet().contains(name)) return "large";
+        if (SporeEntityHelper.bossPoolSet().contains(name)) return "boss";
         return "unknown";
     }
 }
