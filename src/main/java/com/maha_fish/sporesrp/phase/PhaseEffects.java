@@ -321,6 +321,7 @@ public class PhaseEffects {
         Player player = event.getEntity();
         if (player.level().isClientSide) return;
         if (!(player.level() instanceof ServerLevel level)) return;
+        if (!Config.COMMON.preventSleep.get()) return;
 
         int phase = WorldEvolutionData.get(level).getEvolutionPhase();
         if (phase >= 6) {
@@ -340,6 +341,7 @@ public class PhaseEffects {
         }
         if (player.level().isClientSide) return;
         if (!(player.level() instanceof ServerLevel level)) return;
+        if (!Config.COMMON.preventSleep.get()) return;
 
         int phase = WorldEvolutionData.get(level).getEvolutionPhase();
         if (phase >= 6) {

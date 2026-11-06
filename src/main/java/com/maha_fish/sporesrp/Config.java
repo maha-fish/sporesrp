@@ -92,6 +92,7 @@ public class Config {
         public final ModConfigSpec.DoubleValue biomeConvertChunkPoints;
         public final ModConfigSpec.ConfigValue<List<? extends Double>> phasePointMultipliers;
         public final ModConfigSpec.BooleanValue eternalNightAfterPhase6;
+        public final ModConfigSpec.BooleanValue preventSleep;
         public final ModConfigSpec.ConfigValue<List<? extends String>> moundSupportConfigs;
         public final ModConfigSpec.IntValue moundScanIntervalTicks;
         public final ModConfigSpec.ConfigValue<List<? extends Double>> moundLevelPointMultipliers;
@@ -524,10 +525,6 @@ public class Config {
 
             builder.pop();
 
-            eternalNightAfterPhase6 = builder
-                    .comment("当演化阶段达到6后是否强制永夜（世界时间锁定为夜晚）")
-                    .define("eternalNightAfterPhase6", true);
-
             builder.push("proto_marked_mound");
             protoMarkedMoundEnabled = builder
                     .comment("启用 Proto 标记菌囊自动生成与维护")
@@ -870,6 +867,12 @@ public class Config {
             healPenaltyFactor = builder
                     .comment("非孢子生物回血倍率（默认 0.5 = 减半）")
                     .defineInRange("healPenaltyFactor", 0.5, 0.0, 1.0);
+            eternalNightAfterPhase6 = builder
+                    .comment("阶段达到 6 后是否强制永夜（世界时间锁定为夜晚）")
+                    .define("eternalNightAfterPhase6", true);
+            preventSleep = builder
+                    .comment("阶段达到 6 后是否禁止睡觉")
+                    .define("preventSleep", true);
             builder.pop();
 
             // ==================== 诱饵 ====================
