@@ -1,5 +1,6 @@
 package com.maha_fish.sporesrp.handler;
 
+import com.maha_fish.sporesrp.util.SporeSpawnHelper;
 import com.maha_fish.sporesrp.Config;
 import com.maha_fish.sporesrp.data.WorldEvolutionData;
 import com.maha_fish.sporesrp.util.SporeEntityHelper;
@@ -94,10 +95,9 @@ public class MoundHandler {
                     BlockPos spawnPos = entity.blockPosition().offset(dx, dy, dz);
                     if (!level.isLoaded(spawnPos)) continue;
                     if (level.getBlockState(spawnPos.below()).isSolid() && level.getBlockState(spawnPos).isAir()) {
-                        var mound = moundType.create(level);
-                        if (mound != null) {
-                            mound.setPos(spawnPos.getX() + 0.5, spawnPos.getY(), spawnPos.getZ() + 0.5);
-                            level.addFreshEntity(mound);
+                        // 走 finalizeSpawn：Mound 的 setDefaultLinkage 在那里，
+                        // 直接 addFreshEntity 会得到一个「未链接蜂巢心智」的菌囊
+                        if (SporeSpawnHelper.spawnFinalized(level, moundType, spawnPos) != null) {
                             spawned++;
                             break;
                         }

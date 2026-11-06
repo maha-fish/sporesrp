@@ -2,6 +2,7 @@ package com.maha_fish.sporesrp.handler;
 
 import com.maha_fish.sporesrp.Config;
 import com.maha_fish.sporesrp.SporeSRP;
+import com.maha_fish.sporesrp.util.SporeSpawnHelper;
 import com.maha_fish.sporesrp.util.AdvancementTriggerHelper;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
@@ -41,8 +42,8 @@ public class PlayerDeathHandler {
             EntityType<?> gastgeberType = BuiltInRegistries.ENTITY_TYPE.get(gastgeberId);
             var gastgeber = gastgeberType.create(serverLevel);
             if (gastgeber != null) {
-                gastgeber.setPos(victim.getX(), victim.getY(), victim.getZ());
-                serverLevel.addFreshEntity(gastgeber);
+                SporeSpawnHelper.spawnFinalized(serverLevel, gastgeberType,
+                        victim.getX(), victim.getY(), victim.getZ());
                 serverLevel.getServer().getPlayerList().broadcastSystemMessage(
                         Component.translatable("sporesrp.death.spawn_gastgeber", victim.getName().getString()),
                         false

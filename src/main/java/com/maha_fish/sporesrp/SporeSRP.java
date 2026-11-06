@@ -3,6 +3,8 @@ package com.maha_fish.sporesrp;
 import com.maha_fish.sporesrp.adaptation.*;
 import com.maha_fish.sporesrp.battle.PurificationBattle;
 import com.maha_fish.sporesrp.block.ModBlocks;
+import com.maha_fish.sporesrp.client.AdaptationFlashRenderer;
+import com.maha_fish.sporesrp.client.EnvironmentEffectsHandler;
 import com.maha_fish.sporesrp.client.HUDOverlay;
 import com.maha_fish.sporesrp.command.SporeCommands;
 import com.maha_fish.sporesrp.config.SporeConfigBridge;
@@ -11,6 +13,7 @@ import com.maha_fish.sporesrp.enchantment.ModEnchantments;
 import com.maha_fish.sporesrp.handler.*;
 import com.maha_fish.sporesrp.item.ModCreativeTabs;
 import com.maha_fish.sporesrp.item.ModItems;
+import com.maha_fish.sporesrp.network.AdaptationFlashPacket;
 import com.maha_fish.sporesrp.network.SyncEvolutionDataPacket;
 import com.maha_fish.sporesrp.network.ToggleHUDPacket;
 import com.maha_fish.sporesrp.phase.PhaseEffects;
@@ -71,6 +74,9 @@ public class SporeSRP {
         Adaptations.ATTACHMENT_TYPES.register(modEventBus);
         if (FMLEnvironment.dist == Dist.CLIENT) {
             modEventBus.addListener(this::registerGuiLayers);
+            // 客户端环境效果（迷雾 / 雾色 / 孢子粒子）
+            NeoForge.EVENT_BUS.register(EnvironmentEffectsHandler.class);            // 伤害适应的体色反馈（绿光 / 紫光）
+            NeoForge.EVENT_BUS.register(AdaptationFlashRenderer.class);
         }
 
         // ---- 注册事件处理器（NeoForge事件总线） ----
@@ -144,6 +150,13 @@ public class SporeSRP {
                 new DirectionalPayloadHandler<>(
                         ToggleHUDPacket::handleClient,
                         ToggleHUDPacket::handleServer
+                )
+        );        registrar.playBidirectional(
+                AdaptationFlashPacket.TYPE,
+                AdaptationFlashPacket.STREAM_CODEC,
+                new DirectionalPayloadHandler<>(
+                        AdaptationFlashPacket::handleClient,
+                        AdaptationFlashPacket::handleServer
                 )
         );
     }

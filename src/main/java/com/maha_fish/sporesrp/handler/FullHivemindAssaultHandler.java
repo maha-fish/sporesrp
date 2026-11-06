@@ -1,5 +1,6 @@
 package com.maha_fish.sporesrp.handler;
 
+import com.maha_fish.sporesrp.util.SporeSpawnHelper;
 import com.maha_fish.sporesrp.Config;
 import com.maha_fish.sporesrp.data.WorldEvolutionData;
 import com.maha_fish.sporesrp.util.AdvancementTriggerHelper;
@@ -280,6 +281,9 @@ public class FullHivemindAssaultHandler {
             mobEntity.setTarget(target);
         }
 
+        if (mob instanceof Mob assaultMob) {
+            SporeSpawnHelper.finalizeBeforeAdd(assaultMob);
+        }
         level.addFreshEntity(mob);
         return true;
     }

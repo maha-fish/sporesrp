@@ -2,6 +2,7 @@ package com.maha_fish.sporesrp.handler;
 
 import com.maha_fish.sporesrp.Config;
 import com.maha_fish.sporesrp.SporeSRP;
+import com.maha_fish.sporesrp.util.SporeSpawnHelper;
 import com.maha_fish.sporesrp.util.SpawnPositionHelper;
 import com.maha_fish.sporesrp.util.SporeEntityCache;
 import com.maha_fish.sporesrp.util.SporeEntityHelper;
@@ -199,38 +200,21 @@ public class FullHivemindSkillsHandler {
     // ... 以下 spawnEntity, spawnVerva, spawnDelusioner, spawnReconstructor 保持不变 ...
 
     private static void spawnEntity(ServerLevel level, BlockPos pos, EntityType<?> type) {
-        if (type == null) return;
-        LivingEntity entity = (LivingEntity) type.create(level);
-        if (entity == null) return;
-        entity.setPos(pos.getX() + 0.5, pos.getY(), pos.getZ() + 0.5);
-        level.addFreshEntity(entity);
+        SporeSpawnHelper.spawnFinalized(level, type, pos);
     }
 
     private static void spawnVerva(ServerLevel level, BlockPos pos) {
-        EntityType<?> type = BuiltInRegistries.ENTITY_TYPE.get(ResourceLocation.parse("spore:verva"));
-        if (type == null) return;
-        LivingEntity entity = (LivingEntity) type.create(level);
-        if (entity == null) return;
-        entity.setPos(pos.getX() + 0.5, pos.getY(), pos.getZ() + 0.5);
-        level.addFreshEntity(entity);
+        // 必须走 finalizeSpawn：Verwa 的内容物只在 finalizeSpawn 里随机，
+        // defineSynchedData 默认是 spore:knight，直接 addFreshEntity 会永远是骑士。
+        SporeSpawnHelper.spawnFinalized(level, BuiltInRegistries.ENTITY_TYPE.get(ResourceLocation.parse("spore:verva")), pos);
     }
 
     private static void spawnDelusioner(ServerLevel level, BlockPos pos) {
-        EntityType<?> type = BuiltInRegistries.ENTITY_TYPE.get(ResourceLocation.parse("spore:delusioner"));
-        if (type == null) return;
-        LivingEntity entity = (LivingEntity) type.create(level);
-        if (entity == null) return;
-        entity.setPos(pos.getX() + 0.5, pos.getY(), pos.getZ() + 0.5);
-        level.addFreshEntity(entity);
+        SporeSpawnHelper.spawnFinalized(level, BuiltInRegistries.ENTITY_TYPE.get(ResourceLocation.parse("spore:delusioner")), pos);
     }
 
     private static void spawnReconstructor(ServerLevel level, BlockPos pos) {
-        EntityType<?> type = BuiltInRegistries.ENTITY_TYPE.get(ResourceLocation.parse("spore:reconstructor"));
-        if (type == null) return;
-        LivingEntity entity = (LivingEntity) type.create(level);
-        if (entity == null) return;
-        entity.setPos(pos.getX() + 0.5, pos.getY(), pos.getZ() + 0.5);
-        level.addFreshEntity(entity);
+        SporeSpawnHelper.spawnFinalized(level, BuiltInRegistries.ENTITY_TYPE.get(ResourceLocation.parse("spore:reconstructor")), pos);
     }
 
     private static BlockPos getRandomPosAround(BlockPos center, int minDist, int maxDist) {

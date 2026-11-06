@@ -2,6 +2,7 @@ package com.maha_fish.sporesrp.handler;
 
 import com.maha_fish.sporesrp.Config;
 import com.maha_fish.sporesrp.SporeSRP;
+import com.maha_fish.sporesrp.util.SporeSpawnHelper;
 import com.maha_fish.sporesrp.util.SporeEntityHelper;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -122,6 +123,10 @@ public class ProtoMarkedMoundHandler {
         LivingEntity mound = (LivingEntity) moundType.create(level);
         if (mound == null) return false;
         mound.setPos(pos.getX() + 0.5, pos.getY(), pos.getZ() + 0.5);
+        // 入场前先 finalize（Mound 的蜂巢链接在这里），再打标记
+        if (mound instanceof net.minecraft.world.entity.Mob mob) {
+            SporeSpawnHelper.finalizeBeforeAdd(mob);
+        }
         markAsMarkedMound(mound, ownerProtoUuid);
         return level.addFreshEntity(mound);
     }

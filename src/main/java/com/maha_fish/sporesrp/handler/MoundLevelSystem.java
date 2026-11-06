@@ -2,6 +2,7 @@ package com.maha_fish.sporesrp.handler;
 
 import com.maha_fish.sporesrp.Config;
 import com.maha_fish.sporesrp.SporeSRP;
+import com.maha_fish.sporesrp.util.SporeSpawnHelper;
 import com.maha_fish.sporesrp.util.SporeBridge;
 import com.maha_fish.sporesrp.util.SporeEntityHelper;
 import net.minecraft.core.BlockPos;
@@ -13,6 +14,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.AABB;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
@@ -202,10 +204,9 @@ public class MoundLevelSystem {
             if (id == null) continue;
             EntityType<?> type = BuiltInRegistries.ENTITY_TYPE.get(id);
             if (type == null) continue;
-            LivingEntity entity = (LivingEntity) type.create(level);
-            if (entity == null) continue;
-            entity.setPos(pos.getX() + 0.5, pos.getY(), pos.getZ() + 0.5);
-            level.addFreshEntity(entity);
+            LivingEntity summoned = SporeSpawnHelper.spawnFinalized(level, type, pos);
+
+            if (summoned != null) trackSummon(level, summoned);
             return;
         }
     }
@@ -213,12 +214,95 @@ public class MoundLevelSystem {
     private static void spawnScent(ServerLevel level, BlockPos pos) {
         EntityType<?> type = BuiltInRegistries.ENTITY_TYPE.get(ResourceLocation.parse("spore:scent"));
         if (type == null) return;
-        LivingEntity entity = (LivingEntity) type.create(level);
-        if (entity == null) return;
-        entity.setPos(pos.getX() + 0.5, pos.getY(), pos.getZ() + 0.5);
-        level.addFreshEntity(entity);
+        LivingEntity summoned = SporeSpawnHelper.spawnFinalized(level, type, pos);
+
+        if (summoned != null) trackSummon(level, summoned);
     }
 
+    // ==================== 菌囊支援召唤物：抛出 + 生命周期 ====================
+    /**
+     * UUID -> {召唤时的 tick, 最后一次有仇恨的 tick}
+     *
+     * <p>只跟踪被菌囊支援召唤出来的**生物**（{@code Mob}）；
+     * 孢气等非生物实体不跟踪。
+     */
+    private static final Map<UUID, long[]> SUMMONED_MOBS = new ConcurrentHashMap<>();
+    private static int summonSweepTimer = 0;
+    /** 生命周期检查间隔（tick）。 */
+    private static final int SUMMON_SWEEP_INTERVAL = 10;
+
+    /**
+     * 召唤后处理：施加「被抛出」的推力，并登记生命周期。
+     *
+     * <ul>
+     *   <li>向上 + 水平面 360° 随机方向的轻微推力；</li>
+     *   <li>无仇恨满 {@code summonedNoAggroSeconds} 秒 → 消失；</li>
+     *   <li>存在满 {@code summonedLifetimeSeconds} 秒 → 消失；</li>
+     *   <li>被召唤的生物不会再次成为支援触发者（本类只按时间+玩家距离触发，天然不会）。</li>
+     * </ul>
+     */
+    private static void trackSummon(ServerLevel level, LivingEntity entity) {
+        if (!(entity instanceof Mob mob)) return;
+
+        double horizontal = Config.COMMON.supportThrowHorizontal.get();
+        double upward = Config.COMMON.supportThrowUpward.get();
+        if (horizontal > 0.0 || upward > 0.0) {
+            double angle = RANDOM.nextDouble() * Math.PI * 2.0;
+            mob.setDeltaMovement(Math.cos(angle) * horizontal, upward, Math.sin(angle) * horizontal);
+            mob.hurtMarked = true; // 让客户端同步速度
+        }
+
+        long now = level.getGameTime();
+        SUMMONED_MOBS.put(mob.getUUID(), new long[]{now, now});
+    }
+
+    /**
+     * 该生物是否为菌囊支援召唤出来的。
+     *
+     * <p>供 {@code SupportSystemHandler} 判断：被召唤出来的生物不应再次触发受击支援，
+     * 否则会出现「菌囊召唤 → 召唤物被打 → 再支援 → 再召唤」的连锁。
+     */
+    public static boolean isSummoned(LivingEntity entity) {
+        return entity != null && SUMMONED_MOBS.containsKey(entity.getUUID());
+    }
+    /** 清理超时的召唤物：无仇恨 10 秒，或存在 100 秒。 */
+    private static void sweepSummonedMobs(MinecraftServer server) {
+        if (SUMMONED_MOBS.isEmpty() || server == null) return;
+
+        long now = server.overworld().getGameTime();
+        long noAggroTicks = (long) Config.COMMON.supportSummonedNoAggroSeconds.get() * 20L;
+        long lifetimeTicks = (long) Config.COMMON.supportSummonedLifetimeSeconds.get() * 20L;
+
+        Iterator<Map.Entry<UUID, long[]>> iterator = SUMMONED_MOBS.entrySet().iterator();
+        while (iterator.hasNext()) {
+            Map.Entry<UUID, long[]> mapEntry = iterator.next();
+            long[] state = mapEntry.getValue();
+
+            LivingEntity entity = null;
+            for (ServerLevel level : server.getAllLevels()) {
+                if (level.getEntity(mapEntry.getKey()) instanceof LivingEntity living) {
+                    entity = living;
+                    break;
+                }
+            }
+            if (entity == null || !entity.isAlive()) {
+                iterator.remove();
+                continue;
+            }
+
+            if (entity instanceof Mob mob && mob.getTarget() != null && mob.getTarget().isAlive()) {
+                state[1] = now; // 有仇恨，刷新计时
+                continue;
+            }
+
+            boolean lifetimeOut = lifetimeTicks > 0 && now - state[0] >= lifetimeTicks;
+            boolean noAggroOut = noAggroTicks > 0 && now - state[1] >= noAggroTicks;
+            if (lifetimeOut || noAggroOut) {
+                entity.discard();
+                iterator.remove();
+            }
+        }
+    }
     // ==================== 事件监听 ====================
 
     @SubscribeEvent
@@ -267,7 +351,11 @@ public class MoundLevelSystem {
     }
 
     @SubscribeEvent
-    public void onServerTick(ServerTickEvent.Post event) {
+    public void onServerTick(ServerTickEvent.Post event) {        // ---- 0. 菌囊召唤物生命周期（无仇恨 10 秒 / 存在 100 秒） ----
+        if (++summonSweepTimer >= SUMMON_SWEEP_INTERVAL) {
+            summonSweepTimer = 0;
+            sweepSummonedMobs(ServerLifecycleHooks.getCurrentServer());
+        }
 
 
     if (!Config.COMMON_SPEC.isLoaded()) return;ServerLevel overworld = event.getServer().overworld();
@@ -331,28 +419,6 @@ public class MoundLevelSystem {
                 if (!hasTarget) continue;
 
                 cooldownMap.put(uuid, currentTick);
-
-                // 检查周围是否存在其他非类器官体的真菌生物
-                boolean hasOtherFungus = false;
-                AABB checkBox = new AABB(center).inflate(range);
-                List<LivingEntity> nearbyFungus = level.getEntitiesOfClass(LivingEntity.class, checkBox,
-                        e -> e != mound && e.isAlive() && SporeEntityHelper.isSporeEntity(e));
-                if (!nearbyFungus.isEmpty()) {
-                    Set<String> organoids = SporeEntityHelper.organoidSet();
-                    for (LivingEntity e : nearbyFungus) {
-                        ResourceLocation id = SporeEntityHelper.getEntityId(e.getType());
-                        if (id == null) continue;
-                        String name = id.toString();
-                        if (!organoids.contains(name)) {
-                            hasOtherFungus = true;
-                            break;
-                        }
-                    }
-                }
-                if (hasOtherFungus) {
-                    SporeSRP.LOGGER.debug("Mound {} (level {}) skipped support due to nearby non-organoid fungus", uuid, levelNum);
-                    continue;
-                }
 
                 // 触发支援
                 if (cfg.spawnScent) {

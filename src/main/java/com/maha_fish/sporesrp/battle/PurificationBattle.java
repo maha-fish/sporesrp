@@ -2,11 +2,14 @@ package com.maha_fish.sporesrp.battle;
 
 import com.maha_fish.sporesrp.Config;
 import com.maha_fish.sporesrp.SporeSRP;
+import com.maha_fish.sporesrp.util.SporeSpawnHelper;
 import com.maha_fish.sporesrp.block.ModBlocks;
 import com.maha_fish.sporesrp.data.DifficultyManager;
 import com.maha_fish.sporesrp.data.WorldEvolutionData;
 import com.maha_fish.sporesrp.util.AdvancementTriggerHelper;
 import com.maha_fish.sporesrp.util.SporeEntityHelper;
+import net.minecraft.network.protocol.game.ClientboundSoundPacket;
+import net.minecraft.sounds.SoundSource;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
@@ -113,12 +116,29 @@ public class PurificationBattle {
             SporeSRP.LOGGER.debug("Music ID is empty, skipping");
             return;
         }
-        String command = String.format("playsound %s music @a ~ ~ ~ %f %f 1", soundId, volume, pitch);
-        var source = level.getServer().createCommandSourceStack()
-                .withPermission(4)
-                .withSuppressedOutput();
-        level.getServer().getCommands().performPrefixedCommand(source, command);
-        SporeSRP.LOGGER.info("Playing music: {}", soundId);
+
+        // 直接发声音包，不走 /playsound。
+        // 原因：命令源取自 createCommandSourceStack()，其位置是**世界出生点**，
+        // 于是 `~ ~ ~` 把声音播在出生点，离得远的玩家衰减到听不见 ——
+        // 这正是「用指令开战没有 BGM」的原因。
+        // 这里改成对每个玩家、以他自身坐标为播放点发送，音量恒为满，等价于全局 BGM。
+        ResourceLocation id = ResourceLocation.tryParse(soundId);
+        var holderOpt = id == null ? null : BuiltInRegistries.SOUND_EVENT.getHolder(id);
+        if (holderOpt == null || holderOpt.isEmpty()) {
+            SporeSRP.LOGGER.warn("Unknown sound id, music skipped: {}", soundId);
+            return;
+        }
+
+        long seed = level.random.nextLong();
+        int sent = 0;
+        for (ServerPlayer player : level.getServer().getPlayerList().getPlayers()) {
+            player.connection.send(new ClientboundSoundPacket(
+                    holderOpt.get(), SoundSource.MUSIC,
+                    player.getX(), player.getY(), player.getZ(),
+                    volume, pitch, seed));
+            sent++;
+        }
+        SporeSRP.LOGGER.info("Playing music: {} ({} players)", soundId, sent);
     }
 
     private void stopMusic(ServerLevel level) {
@@ -637,6 +657,9 @@ public class PurificationBattle {
 
             entity.setPos(spawnPos.getX() + 0.5, spawnPos.getY(), spawnPos.getZ() + 0.5);
             entity.refreshDimensions();
+            if (entity instanceof Mob battleMob) {
+                SporeSpawnHelper.finalizeBeforeAdd(battleMob);
+            }
             level.addFreshEntity(entity);
 
             if (entity instanceof Mob mob) {

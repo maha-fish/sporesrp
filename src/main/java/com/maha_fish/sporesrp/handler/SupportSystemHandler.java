@@ -2,6 +2,7 @@ package com.maha_fish.sporesrp.handler;
 
 import com.maha_fish.sporesrp.Config;
 import com.maha_fish.sporesrp.SporeSRP;
+import com.maha_fish.sporesrp.util.SporeSpawnHelper;
 import com.maha_fish.sporesrp.data.WorldEvolutionData;
 import com.maha_fish.sporesrp.util.SpawnPositionHelper;
 import com.maha_fish.sporesrp.util.SporeEntityHelper;
@@ -89,6 +90,8 @@ public class SupportSystemHandler {
         ResourceLocation victimId = SporeEntityHelper.getEntityId(victim);
         if (victimId == null || !"spore".equals(victimId.getNamespace())) return;
         if (SporeEntityHelper.isScent(victim)) return;
+        // 菌囊支援召唤出来的生物不再触发受击支援（防连锁）
+        if (MoundLevelSystem.isSummoned(victim)) return;
 
         if (!(victim.level() instanceof ServerLevel serverLevel)) return;
 
@@ -191,10 +194,7 @@ public class SupportSystemHandler {
         BlockPos spawnPos = SpawnPositionHelper.findSpawnPos(world, center, minDist, maxDist);
         if (spawnPos == null) return;
 
-        LivingEntity scent = (LivingEntity) scentType.create(world);
-        if (scent == null) return;
-        scent.setPos(spawnPos.getX() + 0.5, spawnPos.getY(), spawnPos.getZ() + 0.5);
-        world.addFreshEntity(scent);
+        SporeSpawnHelper.spawnFinalized(world, scentType, spawnPos);
     }
 
     private void summonVerva(ServerLevel world, LivingEntity center) {
@@ -204,7 +204,6 @@ public class SupportSystemHandler {
         // 使用 SpawnPositionHelper 查找安全位置
         BlockPos spawnPos = SpawnPositionHelper.findSpawnPos(world, center, minDist, maxDist);
         if (spawnPos == null) return;
-
         // ---- 修复：将坐标转换为浮点数 ----
         double x = spawnPos.getX() + 0.5;
         double y = spawnPos.getY();
@@ -230,6 +229,9 @@ public class SupportSystemHandler {
         if (spawnPos == null) return;
 
         newMob.setPos(spawnPos.getX() + 0.5, spawnPos.getY(), spawnPos.getZ() + 0.5);
+        if (newMob instanceof net.minecraft.world.entity.Mob mob) {
+            SporeSpawnHelper.finalizeBeforeAdd(mob);
+        }
         world.addFreshEntity(newMob);
         int cooldownTicks = Config.COMMON.supportCooldownSeconds.get() * 20;
         COOLDOWNS.put(newMob.getUUID(), world.getGameTime() + cooldownTicks);
