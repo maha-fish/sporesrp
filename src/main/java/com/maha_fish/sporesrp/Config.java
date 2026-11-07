@@ -121,11 +121,6 @@ public class Config {
         public final ForgeConfigSpec.ConfigValue<List<? extends Double>> spawnRateByPhase;
         public final ForgeConfigSpec.ConfigValue<List<? extends Double>> spawnExtraByPhase;
         public final ForgeConfigSpec.IntValue sunlightIgnorePhase;
-        public final ForgeConfigSpec.IntValue sunlightSpawnIntervalTicks;
-        public final ForgeConfigSpec.IntValue sunlightSpawnPerPass;
-        public final ForgeConfigSpec.IntValue sunlightSpawnCap;
-        public final ForgeConfigSpec.DoubleValue sunlightSpawnMinDistance;
-        public final ForgeConfigSpec.DoubleValue sunlightSpawnMaxDistance;
 
         public final ForgeConfigSpec.ConfigValue<List<? extends String>> moundSupportConfigs; // 各等级支援参数
         public final ForgeConfigSpec.IntValue moundScanIntervalTicks;
@@ -974,21 +969,6 @@ public class Config {
             sunlightIgnorePhase = builder
                     .comment("从该阶段起孢子生物可无视阳光生成（白天额外生成），-1 = 关闭")
                     .defineInRange("sunlightIgnorePhase", 3, -1, 10);
-            sunlightSpawnIntervalTicks = builder
-                    .comment("无视阳光生成的尝试间隔（tick）")
-                    .defineInRange("sunlightSpawnIntervalTicks", 400, 20, 6000);
-            sunlightSpawnPerPass = builder
-                    .comment("每次尝试为每个玩家生成几只")
-                    .defineInRange("sunlightSpawnPerPass", 1, 1, 5);
-            sunlightSpawnCap = builder
-                    .comment("玩家 48 格内孢子生物超过该数量时不再补刷")
-                    .defineInRange("sunlightSpawnCap", 24, 0, 200);
-            sunlightSpawnMinDistance = builder
-                    .comment("无视阳光生成的最小距离（格）")
-                    .defineInRange("sunlightSpawnMinDistance", 8.0, 1.0, 64.0);
-            sunlightSpawnMaxDistance = builder
-                    .comment("无视阳光生成的最大距离（格）")
-                    .defineInRange("sunlightSpawnMaxDistance", 24.0, 2.0, 96.0);
 
 
             builder.pop();
