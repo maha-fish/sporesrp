@@ -1,0 +1,14 @@
+{
+  "required": true,
+  "minVersion": "0.8.5",
+  "package": "com.maha_fish.sporesrp.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "refmap": "sporesrp.refmap.json",
+  "mixins": [
+    "MonsterSpawnMixin"
+  ],
+  "client": [],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

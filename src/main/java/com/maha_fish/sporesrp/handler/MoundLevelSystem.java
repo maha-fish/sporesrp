@@ -1,6 +1,7 @@
 package com.maha_fish.sporesrp.handler;
 
 import com.maha_fish.sporesrp.Config;
+import com.maha_fish.sporesrp.data.WorldEvolutionData;
 import com.maha_fish.sporesrp.SporeSRP;
 import com.maha_fish.sporesrp.util.SporeSpawnHelper;
 import net.minecraft.core.BlockPos;
@@ -22,6 +23,7 @@ import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.server.ServerLifecycleHooks;
 import com.maha_fish.sporesrp.util.SporeBridge;
 import com.maha_fish.sporesrp.util.SporeEntityHelper;
+import com.maha_fish.sporesrp.util.SporeTierHelper;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -242,6 +244,9 @@ public class MoundLevelSystem {
      */
     private static void trackSummon(ServerLevel level, LivingEntity entity) {
         if (!(entity instanceof Mob mob)) return;
+        // 孢气等「无等级」的功能性实体不纳入生命周期，否则会被当成召唤物清掉。
+        // ScentEntity 继承 PathfinderMob，单纯判 Mob 会误伤。
+        if (SporeTierHelper.tierOf(entity) == null) return;
 
         double horizontal = Config.COMMON.supportThrowHorizontal.get();
         double upward = Config.COMMON.supportThrowUpward.get();
@@ -388,6 +393,12 @@ public class MoundLevelSystem {
                 // 用 Spore 的真实成长阶段刷新镜像，保证支援强度与原生阶段一致
                 syncLevelFromSpore(uuid, mound);
 
+                // ---- 阶段节点：强制菌囊不低于该阶段的最低等级 ----
+                int phaseFloor = minLevelForPhase(WorldEvolutionData.get(level).getEvolutionPhase());
+                if (phaseFloor > getLevel(uuid)) {
+                    setLevel(uuid, phaseFloor);
+                    SporeSRP.LOGGER.debug("Mound {} forced to level {} by phase floor", uuid, phaseFloor);
+                }
                 int levelNum = getLevel(uuid);
                 SupportConfig cfg = configs.get(levelNum);
                 if (cfg == null) continue;
@@ -462,5 +473,15 @@ public class MoundLevelSystem {
     // ==================== 调试工具 ====================
     public static int getMapSize() {
         return moundDataMap.size();
+    }
+
+    /** 当前演化阶段对应的菌囊最低等级（配置索引 = 演化阶段）。 */
+    private static int minLevelForPhase(int phase) {
+        var list = Config.COMMON.moundMinLevelByPhase.get();
+        if (list == null || list.isEmpty()) return 1;
+        int index = Math.max(0, Math.min(phase, list.size() - 1));
+        Integer value = list.get(index);
+        if (value == null) return 1;
+        return Math.max(1, Math.min(value, 4));
     }
 }

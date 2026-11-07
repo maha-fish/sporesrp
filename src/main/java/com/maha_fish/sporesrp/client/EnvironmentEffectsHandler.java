@@ -104,16 +104,6 @@ public class EnvironmentEffectsHandler {
         if (!Config.COMMON.environmentEnabled.get()) return;
         if (!Config.COMMON.environmentFogEnabled.get()) return;
 
-        // 群系内强制的暗红雾色
-        if (Config.COMMON.environmentBiomeFogEnabled.get() && inInfectedBiome()) {
-            double strength = Config.COMMON.environmentBiomeFogTint.get();
-            if (strength > 0.0) {
-                event.setRed((float) (event.getRed() + (0.42 - event.getRed()) * strength));
-                event.setGreen((float) (event.getGreen() + (0.03 - event.getGreen()) * strength));
-                event.setBlue((float) (event.getBlue() + (0.03 - event.getBlue()) * strength));
-            }
-            return;
-        }
 
         double t = byPhase(Config.COMMON.environmentFogTintByPhase.get(), phase(), 0.0);
         if (t <= 0.0) return;

@@ -96,6 +96,7 @@ public class SporeSRP {
         MinecraftForge.EVENT_BUS.register(new PhaseGateHandler());
         // ---- 净化世界：一次性清扫 + 刷怪入口拦截 ----
         MinecraftForge.EVENT_BUS.register(PurifiedWorldHandler.class);
+        MinecraftForge.EVENT_BUS.register(PhaseSpawnGateHandler.class);
 
 
         // ---- 注册附魔事件处理器 ----

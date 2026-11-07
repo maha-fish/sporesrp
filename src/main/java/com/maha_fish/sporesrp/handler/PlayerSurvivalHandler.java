@@ -1,28 +1,28 @@
 package com.maha_fish.sporesrp.handler;
 
-import com.maha_fish.sporesrp.data.WorldEvolutionData;
 import com.maha_fish.sporesrp.util.AdvancementTriggerHelper;
-import com.maha_fish.sporesrp.util.SporeEntityCache;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.level.Level;
+import net.minecraft.world.level.biome.Biome;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-
 public class PlayerSurvivalHandler {
 
-    /**
-     * 每个维度最近一次已执行「感染扩散」检查的游戏刻。
-     * 同一游戏刻内多个玩家同时满足 {@code tickCount % 40 == 0} 时，
-     * hasAliveProto + onInfectionSpread 这份与玩家无关的工作只做一次。
-     * 触发时刻与原实现完全相同（仍由各玩家的 40 tick 条件驱动），
-     * 且 onInfectionSpread 本身是全局一次性逻辑，重复调用本就无副作用。
-     */
-    private static final Map<ResourceKey<Level>, Long> LAST_INFECTION_CHECK_TICK = new ConcurrentHashMap<>();
+    /** 孢子感染群系。 */
+    private static final ResourceKey<Biome> INFECTED_BIOME = ResourceKey.create(
+            Registries.BIOME, ResourceLocation.tryParse("sporesrp:infected_biome"));
+
+    /** 玩家当前是否真正站在孢子感染群系内。 */
+    private static boolean isInInfectedBiome(ServerPlayer player, ServerLevel level) {
+        return level.getBiome(player.blockPosition())
+                .unwrapKey()
+                .map(key -> INFECTED_BIOME.equals(key))
+                .orElse(false);
+    }
 
     @SubscribeEvent
     public void onPlayerTick(TickEvent.PlayerTickEvent event) {
@@ -30,21 +30,15 @@ public class PlayerSurvivalHandler {
         if (!(event.player instanceof ServerPlayer player)) return;
         if (player.isDeadOrDying()) return;
 
-        // ★ 每 20 tick 更新一次生存时间（保持不变）
+        // 每 20 tick 更新一次生存时间
         if (player.tickCount % 20 == 0) {
             AdvancementTriggerHelper.tickSurvival(player);
         }
-        if (player.tickCount % 40 == 0) {
-            ServerLevel level = (ServerLevel) player.level();
-            long gameTick = level.getGameTime();
-            Long last = LAST_INFECTION_CHECK_TICK.get(level.dimension());
-            if (last != null && last.longValue() == gameTick) {
-                return; // 本刻已检查过该维度
-            }
-            LAST_INFECTION_CHECK_TICK.put(level.dimension(), gameTick);
-            boolean hasProto = SporeEntityCache.hasAliveProto(level);
-            if (hasProto) {
-                AdvancementTriggerHelper.onInfectionSpread(level);
+
+        // 「进入感染群系」进度：玩家真正站在感染群系里才授予（每人一次）
+        if (player.tickCount % 40 == 0 && player.level() instanceof ServerLevel level) {
+            if (isInInfectedBiome(player, level)) {
+                AdvancementTriggerHelper.onEnterInfectedBiome(player);
             }
         }
     }
