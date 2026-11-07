@@ -952,8 +952,8 @@ public class Config {
                             "留空表示该阶段不限制")
                     .defineList("spawnTiersByPhase",
                             List.of("small", "small", "small,medium", "small,medium", "small,medium",
-                                    "medium,large", "medium,large", "medium,large",
-                                    "large,boss", "large,boss", "boss"),
+                                    "small,medium,large", "small,medium,large", "small,medium,large",
+                                    "small,medium,large,boss", "small,medium,large,boss", "small,medium,large,boss"),
                             o -> o instanceof String);
             nonSporeSpawnBlockPhase = builder
                     .comment("从该阶段起停止**非孢子生物**的天然生成（只作用于普通群系），0 = 关闭")

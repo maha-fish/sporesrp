@@ -49,7 +49,6 @@ minecraft {
 sourceSets.main.resources { srcDir 'src/generated/resources' }
 
 repositories {
-    maven { url = 'https://repo.spongepowered.org/repository/maven-public/' }
     maven { url 'https://maven.aliyun.com/repository/public/' }
     maven { url 'https://maven.aliyun.com/repository/central' }
     maven { url 'https://lss233.littleservice.cn/repositories/minecraft/' }
@@ -61,9 +60,6 @@ repositories {
 
 dependencies {
     minecraft 'net.minecraftforge:forge:1.20.1-47.4.10'
-
-    // Mixin：用于「阶段解锁无视阳光生成」
-    compileOnly 'org.spongepowered:mixin:0.8.5'
 
     // 如需本地依赖，取消注释并指定 jar 文件名
     // implementation fg.deobf("flat:spore:2.2.0h")
@@ -85,8 +81,7 @@ tasks.named('jar', Jar).configure {
                 'Implementation-Title'    : project.name,
                 'Implementation-Version'  : project.jar.archiveVersion,
                 'Implementation-Vendor'   : 'maha_fish',
-                'Implementation-Timestamp': new Date().format("yyyy-MM-dd'T'HH:mm:ssZ"),
-                'MixinConfigs'            : 'sporesrp.mixins.json'
+                'Implementation-Timestamp': new Date().format("yyyy-MM-dd'T'HH:mm:ssZ")
         ])
     }
     finalizedBy 'reobfJar'
@@ -99,7 +94,6 @@ publishing {
         }
     }
     repositories {
-    maven { url = 'https://repo.spongepowered.org/repository/maven-public/' }
         maven {
             url "file://${project.projectDir}/mcmodsrepo"
         }

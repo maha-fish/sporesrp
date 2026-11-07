@@ -1,7 +1,0 @@
-{
-  "mappings": {
-    "com/maha_fish/sporesrp/mixin/MonsterSpawnMixin": {
-      "checkMonsterSpawnRules": "m_219013_"
-    }
-  }
-}
