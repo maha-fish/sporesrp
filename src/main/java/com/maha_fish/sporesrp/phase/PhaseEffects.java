@@ -68,7 +68,6 @@ public class PhaseEffects {
         }
 
         if (newPhase >= 6 && oldPhase < 6) {
-            AdvancementTriggerHelper.onInfectionSpread(level);
         }
         AdvancementTriggerHelper.onPhaseChange(level, newPhase);
 

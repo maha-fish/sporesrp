@@ -216,23 +216,29 @@ public class CDUCommandHandler {
             ServerLevel level = server.getLevel(dimension);
             if (level == null) return;
 
-            positions.entrySet().removeIf(entry -> {
-                BlockEntity blockEntity = level.getBlockEntity(entry.getKey());
-                if (!isCdu(blockEntity)) return true; // 方块不在了，停止跟踪
+            // 注意：ConcurrentHashMap 的 entrySet().removeIf() 传给谓词的是**不可变 Entry**，
+            // 在谓词里调用 entry.setValue(...) 会抛 UnsupportedOperationException 并打崩服务器线程。
+            // 这里改为普通迭代 + CHM 自身允许的 put/remove。
+            for (Map.Entry<BlockPos, Integer> entry : positions.entrySet()) {
+                BlockPos cduPos = entry.getKey();
+                BlockEntity blockEntity = level.getBlockEntity(cduPos);
+                if (!isCdu(blockEntity)) {
+                    positions.remove(cduPos); // 方块不在了，停止跟踪
+                    continue;
+                }
 
                 int fuel = readFuel(blockEntity);
-                if (fuel < 0) return false;
+                if (fuel < 0) continue;
 
-                int lastFuel = entry.getValue();
-                entry.setValue(fuel);
+                Integer lastFuel = entry.getValue();
+                positions.put(cduPos, fuel);
 
                 // 与原模组 cleanInfection 同一个判定：fuel % 200 == 0 且燃料确实在下降
-                if (fuel > 0 && fuel % PULSE_TICKS == 0 && fuel != lastFuel) {
-                    submitClearCommand(level, entry.getKey());
-                    SporeSRP.LOGGER.debug("CDU pulse at {} (fuel={}): purifying biome", entry.getKey(), fuel);
+                if (fuel > 0 && fuel % PULSE_TICKS == 0 && (lastFuel == null || lastFuel != fuel)) {
+                    submitClearCommand(level, cduPos);
+                    SporeSRP.LOGGER.debug("CDU pulse at {} (fuel={}): purifying biome", cduPos, fuel);
                 }
-                return false;
-            });
+            }
         });
     }
 }

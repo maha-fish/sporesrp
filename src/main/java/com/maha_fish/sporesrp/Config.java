@@ -108,8 +108,19 @@ public class Config {
         public final ModConfigSpec.ConfigValue<List<? extends Double>> phasePointMultipliers;
         public final ModConfigSpec.BooleanValue eternalNightAfterPhase6;
         public final ModConfigSpec.BooleanValue preventSleep;
+        public final ModConfigSpec.ConfigValue<List<? extends String>> spawnTiersByPhase;
+        public final ModConfigSpec.IntValue nonSporeSpawnBlockPhase;
+        public final ModConfigSpec.ConfigValue<List<? extends Double>> spawnRateByPhase;
+        public final ModConfigSpec.ConfigValue<List<? extends Double>> spawnExtraByPhase;
+        public final ModConfigSpec.IntValue sunlightIgnorePhase;
+        public final ModConfigSpec.IntValue sunlightSpawnIntervalTicks;
+        public final ModConfigSpec.IntValue sunlightSpawnPerPass;
+        public final ModConfigSpec.IntValue sunlightSpawnCap;
+        public final ModConfigSpec.DoubleValue sunlightSpawnMinDistance;
+        public final ModConfigSpec.DoubleValue sunlightSpawnMaxDistance;
         public final ModConfigSpec.ConfigValue<List<? extends String>> moundSupportConfigs;
         public final ModConfigSpec.IntValue moundScanIntervalTicks;
+        public final ModConfigSpec.ConfigValue<List<? extends Integer>> moundMinLevelByPhase;
         public final ModConfigSpec.ConfigValue<List<? extends Double>> moundLevelPointMultipliers;
 
         public final ModConfigSpec.BooleanValue protoMarkedMoundEnabled;
@@ -244,7 +255,6 @@ public class Config {
         public final ModConfigSpec.BooleanValue environmentBiomeFogEnabled;
         public final ModConfigSpec.DoubleValue environmentBiomeFogNear;
         public final ModConfigSpec.DoubleValue environmentBiomeFogFar;
-        public final ModConfigSpec.DoubleValue environmentBiomeFogTint;
         public final ModConfigSpec.DoubleValue environmentParticlesPerSecond;
 
         // ========== CDU 净化 ==========
@@ -561,6 +571,15 @@ public class Config {
             moundScanIntervalTicks = builder
                     .comment("菌囊实体扫描间隔（tick），即使冷却已结束，也不会每 tick 扫描")
                     .defineInRange("scanIntervalTicks", 40, 5, 100);
+
+            moundMinLevelByPhase = builder
+                    .comment("阶段节点强制菌囊最低等级：索引 = 演化阶段（0..10），值为最低等级（1..4）",
+                            "阶段达到该值时，所有菌囊会被强制提升到不低于此等级",
+                            "默认：阶段0-4 不干预，阶段5-6 → 2，阶段7-8 → 3，阶段9-10 → 4")
+                    .defineList("minLevelByPhase",
+                            List.of(1, 1, 1, 1, 1, 2, 2, 3, 3, 4, 4),
+                            o -> o instanceof Integer);
+
 
             builder.pop();
 
@@ -912,6 +931,54 @@ public class Config {
             preventSleep = builder
                     .comment("阶段达到 6 后是否禁止睡觉")
                     .define("preventSleep", true);
+
+            // ---- 阶段化刷怪（只作用于天然生成，感染群系独立不干预）----
+            spawnTiersByPhase = builder
+                    .comment("各演化阶段允许**天然生成**的孢子生物等级，索引 = 阶段（0..10）",
+                            "逗号分隔，可选 small / medium / large / boss",
+                            "只作用于普通群系的天然生成；sporesrp:infected_biome 的刷怪表独立，不受此影响",
+                            "留空表示该阶段不限制")
+                    .defineList("spawnTiersByPhase",
+                            List.of("small", "small", "small,medium", "small,medium", "small,medium",
+                                    "medium,large", "medium,large", "medium,large",
+                                    "large,boss", "large,boss", "boss"),
+                            o -> o instanceof String);
+            nonSporeSpawnBlockPhase = builder
+                    .comment("从该阶段起停止**非孢子生物**的天然生成（只作用于普通群系），0 = 关闭")
+                    .defineInRange("nonSporeSpawnBlockPhase", 10, 0, 10);
+
+            spawnRateByPhase = builder
+                    .comment("阶段刷怪量曲线（保留概率，0..1）：天然生成的孢子生物按此概率保留",
+                            "低阶段过滤掉一部分 → 稀疏；高阶段 1.0 → 完整密度")
+                    .defineList("spawnRateByPhase",
+                            List.of(0.35, 0.40, 0.50, 0.55, 0.60, 0.70, 0.78, 0.85, 0.92, 0.97, 1.00),
+                            o -> o instanceof Double);
+            spawnExtraByPhase = builder
+                    .comment("阶段额外追加概率（0..1）：成功天然生成后，再追加生成一只同类的概率",
+                            "高阶段可超过原版密度上限，做出真正的难度曲线")
+                    .defineList("spawnExtraByPhase",
+                            List.of(0.00, 0.00, 0.00, 0.00, 0.05, 0.10, 0.18, 0.28, 0.40, 0.55, 0.75),
+                            o -> o instanceof Double);
+            sunlightIgnorePhase = builder
+                    .comment("从该阶段起孢子生物可无视阳光生成（白天额外生成），-1 = 关闭")
+                    .defineInRange("sunlightIgnorePhase", 3, -1, 10);
+            sunlightSpawnIntervalTicks = builder
+                    .comment("无视阳光生成的尝试间隔（tick）")
+                    .defineInRange("sunlightSpawnIntervalTicks", 400, 20, 6000);
+            sunlightSpawnPerPass = builder
+                    .comment("每次尝试为每个玩家生成几只")
+                    .defineInRange("sunlightSpawnPerPass", 1, 1, 5);
+            sunlightSpawnCap = builder
+                    .comment("玩家 48 格内孢子生物超过该数量时不再补刷")
+                    .defineInRange("sunlightSpawnCap", 24, 0, 200);
+            sunlightSpawnMinDistance = builder
+                    .comment("无视阳光生成的最小距离（格）")
+                    .defineInRange("sunlightSpawnMinDistance", 8.0, 1.0, 64.0);
+            sunlightSpawnMaxDistance = builder
+                    .comment("无视阳光生成的最大距离（格）")
+                    .defineInRange("sunlightSpawnMaxDistance", 24.0, 2.0, 96.0);
+
+
             builder.pop();
 
             // ==================== 诱饵 ====================
@@ -973,12 +1040,10 @@ public class Config {
             environmentBiomeFogFar = builder
                     .comment("群系内雾终点（格）：越小能见度越低")
                     .defineInRange("biomeFogFar", 48.0, 8.0, 512.0);
-            environmentBiomeFogTint = builder
-                    .comment("群系内雾色向暗红混合的强度（0 = 不染色，1 = 完全暗红）")
-                    .defineInRange("biomeFogTint", 0.85, 0.0, 1.0);
+
             environmentParticlesPerSecond = builder
-                    .comment("孢子粒子密度（个/秒，默认 6）")
-                    .defineInRange("particlesPerSecond", 6.0, 0.0, 60.0);
+                    .comment("孢子粒子密度（个/秒，默认 20）")
+                    .defineInRange("particlesPerSecond", 20.0, 0.0, 120.0);
             builder.pop();
 
             // ==================== CDU 净化 ====================

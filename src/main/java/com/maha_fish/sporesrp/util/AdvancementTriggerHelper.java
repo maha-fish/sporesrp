@@ -11,7 +11,6 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class AdvancementTriggerHelper {
 
-    private static boolean infectionSpreadTriggered = false;
 
     // ========== 计数器 ==========
     private static final ConcurrentHashMap<UUID, KillCounter> killCounters = new ConcurrentHashMap<>();
@@ -151,10 +150,17 @@ public class AdvancementTriggerHelper {
         markTriggered(player, "encounter_builder");
     }
 
-    public static void onInfectionSpread(ServerLevel level) {
-        if (level == null || infectionSpreadTriggered) return;
-        infectionSpreadTriggered = true;
-        grantToAll(level, "infection_spread");
+    /**
+     * 「进入感染群系」进度：**玩家真正踏入感染群系**时授予（每人一次）。
+     *
+     * <p>以前是在感染扩散时全服广播（玩家可能根本没去过），
+     * 现在改为由 {@code PlayerSurvivalHandler} 每 20 tick 检查玩家所在群系后调用。
+     */
+    public static void onEnterInfectedBiome(ServerPlayer player) {
+        if (player == null) return;
+        if (hasTriggered(player, "infection_spread")) return;
+        grant(player, "infection_spread");
+        markTriggered(player, "infection_spread");
     }
 
     public static void onSleepFail(ServerPlayer player) {
@@ -223,6 +229,5 @@ public class AdvancementTriggerHelper {
         survivalTicks.clear();
         triggeredOnce.clear();
         lastSurvivalCheckTick.clear();
-        infectionSpreadTriggered = false;
     }
 }

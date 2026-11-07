@@ -1,6 +1,7 @@
 package com.maha_fish.sporesrp.adaptation;
 
 import com.maha_fish.sporesrp.Config;
+import com.maha_fish.sporesrp.SporeSRP;
 import com.maha_fish.sporesrp.network.AdaptationFlashPacket;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.server.level.ServerLevel;
@@ -28,6 +29,8 @@ public final class AdaptationFlash {
 
     /** 闪光生效的玩家范围（格）。 */
     private static final double SEND_RADIUS = 64.0;
+    /** 只记录一次，用于确认触发链路。 */
+    private static boolean loggedTrigger;
 
     private AdaptationFlash() {
     }
@@ -50,6 +53,10 @@ public final class AdaptationFlash {
         if (!Config.COMMON.adaptationVisualEnabled.get()) return;
         if (!(entity.level() instanceof ServerLevel level)) return;
 
+        if (!loggedTrigger) {
+            loggedTrigger = true;
+            SporeSRP.LOGGER.info("Adaptation flash triggered (entity={}, kind={})", entity.getType(), kind);
+        }
         int duration = Config.COMMON.adaptationFlashDurationTicks.get();
         AdaptationFlashPacket packet = new AdaptationFlashPacket(entity.getId(), kind, duration);
 

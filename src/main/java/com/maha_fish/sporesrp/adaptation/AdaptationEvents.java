@@ -54,28 +54,36 @@ public class AdaptationEvents {
         if (adaptation == null) return;
 
         int count = adaptation.getAdaptation(key);
+        // 已完全适应该伤害来源：此后每次受击都算「完全适应」
+        boolean fullyAdapted = count >= params.maxCount;
 
-        if (params.immune && count >= params.maxCount) {
+        // ---- 1) 应用当前减伤 ----
+        if (params.immune && fullyAdapted) {
             event.getContainer().setNewDamage(0.0F);
         } else {
             float effective = Math.min(count * perHit, maxTotalReduction);
             event.getContainer().setNewDamage(event.getContainer().getNewDamage() * (1.0F - effective));
         }
 
+        // ---- 2) 尝试产生新的适应（已达上限则不再累积）----
         boolean produced = false;
-        boolean knownType = count > 0;
-        if (!knownType && adaptation.getAdaptedTypeCount() >= maxTypes) {
-            // 可适应类型数已满：不再学习新来源
-        } else if (entity.getRandom().nextFloat() < probability) {
-            adaptation.addAdaptation(key, 1);
-            count++;
-            produced = true;
+        if (!fullyAdapted) {
+            boolean knownType = count > 0;
+            boolean roomForNewType = knownType || adaptation.getAdaptedTypeCount() < maxTypes;
+            if (roomForNewType && entity.getRandom().nextFloat() < probability) {
+                adaptation.addAdaptation(key, 1);
+                count++;
+                produced = true;
+                fullyAdapted = count >= params.maxCount;
+            }
         }
 
-        if (produced) {
-            AdaptationFlash.trigger(entity, count >= params.maxCount
-                    ? AdaptationFlashPacket.KIND_FULL
-                    : AdaptationFlashPacket.KIND_ADAPTING);
+        // ---- 3) 视觉反馈 ----
+        // 完全适应 → 紫（每次受击都显示）；本次新产生适应 → 绿
+        if (fullyAdapted) {
+            AdaptationFlash.trigger(entity, AdaptationFlashPacket.KIND_FULL);
+        } else if (produced) {
+            AdaptationFlash.trigger(entity, AdaptationFlashPacket.KIND_ADAPTING);
         }
     }
 }
