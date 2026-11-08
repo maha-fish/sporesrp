@@ -36,6 +36,7 @@ public final class SporeBridge {
     private static boolean moundMethodsResolved;
     private static Method getAgeMethod;
     private static Method getLinkedMethod;
+    private static Method setAgeMethod;
 
     private static boolean serverHolderResolved;
     private static Object serverHolder;
@@ -59,6 +60,26 @@ public final class SporeBridge {
         }
     }
 
+    /**
+     * 设置 Spore 菌囊的成长阶段（1..4）。
+     *
+     * <p>对应 {@code Mound#setAge(int)}：写的是 {@code SynchedEntityData}，
+     * 服务端改完会自动同步给客户端，因此**外观尺寸、感染半径、{@code /data get entity} 里的 age 都会一起变**。
+     * 只改我方镜像等级是无效的——那只会影响支援参数，外观/范围仍按 Spore 自己的 AGE。
+     *
+     * @return 是否成功写入
+     */
+    public static boolean setMoundAge(LivingEntity mound, int age) {
+        if (mound == null) return false;
+        Method m = setAgeMethod();
+        if (m == null) return false;
+        try {
+            m.invoke(mound, Math.max(1, Math.min(age, 4)));
+            return true;
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
     /** 是否被蜂巢思维链接；读不到时退化为检查 Spore 写在 persistentData 里的 {@code hivemind} 标记。 */
     public static boolean isMoundLinked(LivingEntity mound) {
         if (mound == null) return false;
@@ -107,6 +128,11 @@ public final class SporeBridge {
 
     // ==================== 内部 ====================
 
+    private static Method setAgeMethod() {
+        resolveMoundMethods();
+        return setAgeMethod;
+    }
+
     private static Method getAgeMethod() {
         resolveMoundMethods();
         return getAgeMethod;
@@ -124,6 +150,7 @@ public final class SporeBridge {
             Class<?> c = Class.forName(MOUND_CLASS);
             getAgeMethod = c.getMethod("getAge");
             getLinkedMethod = c.getMethod("getLinked");
+            setAgeMethod = c.getMethod("setAge", int.class);
         } catch (Throwable t) {
             warnOnce("mound-methods",
                     "读取不到 Spore 菌囊的 getAge/getLinked，菌囊半径与链接判定将退化为配置值：" + t);

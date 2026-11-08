@@ -2,6 +2,9 @@ package com.maha_fish.sporesrp.battle;
 
 import com.maha_fish.sporesrp.Config;
 import com.maha_fish.sporesrp.SporeSRP;
+import java.util.Set;
+import net.minecraft.world.level.levelgen.Heightmap;
+import com.maha_fish.sporesrp.util.SporeBridge;
 import com.maha_fish.sporesrp.util.SporeSpawnHelper;
 import com.maha_fish.sporesrp.block.ModBlocks;
 import com.maha_fish.sporesrp.data.DifficultyManager;
@@ -286,6 +289,7 @@ public class PurificationBattle {
         data.setPhaseTimer(0);
         data.setLastMinute(-1);
         data.setTotalSpawned(0);
+        onPhaseEnter(level, data);
 
         // ★ 修改：getDisplayName() 现在返回 Component，可直接用于 translatable
         Component msg = Component.translatable("sporesrp.battle.debug.phase_set", targetPhase.getDisplayName());
@@ -312,6 +316,12 @@ public class PurificationBattle {
             if (data.isActive()) return false;
         }
 
+        if (!checkBattleHeight(level, beaconPos, corePos)) {
+            Component msg = Component.translatable("sporesrp.finalbattle.too_low");
+            level.getServer().getPlayerList().broadcastSystemMessage(msg, false);
+            SporeSRP.LOGGER.warn("Battle start rejected: below sea level at {}", corePos);
+            return false;
+        }
         BattleData data = new BattleData();
         data.setActive(true);
         data.setBeaconPos(beaconPos);
@@ -338,6 +348,13 @@ public class PurificationBattle {
 
         BattleSceneManager.generateArena(level, beaconPos, corePos);
 
+        // 天气、刷怪锚点、阶段入场
+        BattleWeather.begin(level, data, 25000);
+        data.setSpawnPlan(BattleSpawnPlanner.prepare(level, beaconPos, corePos));
+        data.setNextLightningTick(level.getServer().getTickCount()
+                + Config.COMMON.battleLightningIntervalTicks.get());
+        onPhaseEnter(level, data);
+
         Component msg = Component.translatable("sporesrp.battle.start");
         level.getServer().getPlayerList().broadcastSystemMessage(msg, false);
         sendActionBar(level, msg, beaconPos);
@@ -359,6 +376,10 @@ public class PurificationBattle {
 
         // 移除音乐循环记录
         musicLoopTickMap.remove(key);
+
+        // 恢复战前天气 + 拆除临时刷怪平台
+        BattleWeather.release(level, data);
+        BattleSpawnPlanner.restorePads(level, data.getSpawnPlan());
 
         // 停止音乐
         stopMusic(level);
@@ -515,6 +536,17 @@ public class PurificationBattle {
             }
 
 
+            // ---- 天气断言 + 定期落雷 ----
+            if (currentTick % 100 == 0) {
+                BattleWeather.assertThunder(level);
+            }
+            if (currentTick >= data.getNextLightningTick()) {
+                BattleWeather.strike(level, beaconPos, corePos);
+                int baseInterval = Config.COMMON.battleLightningIntervalTicks.get();
+                int jitter = Math.max(1, baseInterval * 2 / 5);
+                data.setNextLightningTick(currentTick + baseInterval
+                        + level.random.nextInt(jitter * 2 + 1) - jitter);
+            }
             // ★★★ 音乐切换检测（intro 结束后切换到 loop） ★★★
             if (data.isMusicIntroPlaying()) {
                 long elapsedTicks = level.getServer().getTickCount() - data.getMusicStartTick();
@@ -620,6 +652,7 @@ public class PurificationBattle {
                 data.setPhaseTimer(0);
                 data.setLastMinute(-1);
                 data.setTotalSpawned(0);
+        onPhaseEnter(level, data);
 
                 if (nextPhase.isCompleted()) {
                     endBattle(level, beaconPos, true);
@@ -635,165 +668,258 @@ public class PurificationBattle {
         }
     }
 
-    // ==================== 怪物生成 ====================
+    // ==================== 怪物生成（阶段化） ====================
 
+    /** 每波：按阶段决定组成；阶段4 走灾厄轮转。 */
     private void spawnWave(ServerLevel level, BattleData data, BlockPos center) {
         BattlePhase phase = data.getCurrentPhase();
         if (phase.isCompleted()) return;
-
-        int currentMinute = data.getPhaseTimer() / 1200;
-        int lastMinute = data.getLastMinute();
-
-        if (currentMinute > lastMinute && data.getPhaseTimer() > 0) {
-            data.setLastMinute(currentMinute);
-
-            BattleDifficulty difficulty = new BattleDifficulty(level, center);
-            int baseSpawns = 4 + difficulty.getExtraSpawnsPerMinute();
-            int count = Math.min(baseSpawns + difficulty.getExtraSpawnsPerMinute() * currentMinute, 30);
-
-            SporeSRP.LOGGER.info("Spawning wave {}: {} monsters for phase {}", currentMinute, count, phase.name());
-            spawnMonsters(level, center, phase, count);
-            data.addSpawned(count);
+        if (data.getSpawnPlan() == null) {
+            data.setSpawnPlan(BattleSpawnPlanner.prepare(level, center, data.getCorePos()));
         }
-    }
 
-    private void spawnMonsters(ServerLevel level, BlockPos center, BattlePhase phase, int count) {
-        List<String> pool = getPoolForPhase(phase);
-        if (pool.isEmpty()) {
-            SporeSRP.LOGGER.warn("Monster pool is empty for phase {}, no monsters spawned!", phase.name());
+        // 阶段4：按固定间隔出灾厄（每波 2~3 只，轮完重新打乱）
+        if (phase == BattlePhase.PHASE_4) {
+            int interval = Math.max(20, Config.COMMON.calamityWaveIntervalTicks.get());
+            int wave = data.getPhaseTimer() / interval;
+            if (wave <= data.getLastMinute()) return;
+            data.setLastMinute(wave);
+            spawnCalamityWave(level, data);
             return;
         }
 
-        SporeSRP.LOGGER.info("Spawning {} monsters for phase {} from pool (size {})", count, phase.name(), pool.size());
+        int currentMinute = data.getPhaseTimer() / 1200;
+        if (currentMinute <= data.getLastMinute() || data.getPhaseTimer() <= 0) return;
+        data.setLastMinute(currentMinute);
 
+        BattleDifficulty difficulty = new BattleDifficulty(level, center);
+        int baseSpawns = 4 + difficulty.getExtraSpawnsPerMinute();
+        int count = Math.min(baseSpawns + difficulty.getExtraSpawnsPerMinute() * currentMinute, 30);
+        // 难度系数加成：每级 +10%，上限 2.5 倍
+        double mult = Math.min(2.5, 1.0 + 0.10 * Math.max(0, difficulty.getFinalDifficulty() - 1));
+        count = Math.max(1, (int) Math.round(count * mult));
+
+        switch (phase) {
+            case PHASE_1 -> {
+                // 小 : 中 = 5 : 1
+                spawnComposed(level, data, count,
+                        sanitize(SporeEntityHelper.getSmallPool()), 5,
+                        sanitize(SporeEntityHelper.getMediumPool()), 1);
+            }
+            case PHASE_2 -> spawnFlyingWave(level, data, count);
+            case PHASE_3 -> {
+                // 中 : 大 = 3 : 1
+                spawnComposed(level, data, count,
+                        sanitize(SporeEntityHelper.getMediumPool()), 3,
+                        sanitize(SporeEntityHelper.getLargePool()), 1);
+            }
+            default -> { }
+        }
+        data.addSpawned(count);
+    }
+
+    /** 按权重分层生成（保证数量比例，而不是概率抽取）。 */
+    private void spawnComposed(ServerLevel level, BattleData data, int total,
+                               List<String> poolA, int weightA, List<String> poolB, int weightB) {
+        List<String> a = new ArrayList<>(poolA);
+        List<String> b = new ArrayList<>(poolB);
+        if (a.isEmpty() && b.isEmpty()) {
+            SporeSRP.LOGGER.warn("Battle: both composition pools are empty, wave skipped");
+            return;
+        }
+        if (b.isEmpty()) {
+            spawnFromPool(level, data, a, total, false);
+            return;
+        }
+        if (a.isEmpty()) {
+            spawnFromPool(level, data, b, total, false);
+            return;
+        }
+        int countA = Math.max(0, (int) Math.round((double) total * weightA / (weightA + weightB)));
+        int countB = Math.max(0, total - countA);
+        spawnFromPool(level, data, a, countA, false);
+        spawnFromPool(level, data, b, countB, false);
+    }
+
+    /** 阶段2：飞行生物 + 每波固定数量的 hinderburg。 */
+    private void spawnFlyingWave(ServerLevel level, BattleData data, int count) {
+        List<String> flying = new ArrayList<>();
+        for (String id : Config.COMMON.phase2FlyingPool.get()) {
+            if (id != null && !id.isBlank()) flying.add(id.trim());
+        }
+        if (flying.isEmpty()) {
+            SporeSRP.LOGGER.warn("Battle phase 2: flying pool is empty, falling back to large pool");
+            flying = sanitize(SporeEntityHelper.getLargePool());
+        }
+        spawnFromPool(level, data, flying, count, true);
+
+        int hinderburgs = Config.COMMON.phase2HinderburgPerWave.get();
+        for (int i = 0; i < hinderburgs; i++) {
+            spawnFromPool(level, data, List.of("spore:hinderburg"), 1, true);
+        }
+    }
+
+    /** 阶段4：每波 2~3 只灾厄，按轮转顺序取，轮完重新开始。 */
+    private void spawnCalamityWave(ServerLevel level, BattleData data) {
+        int min = Math.max(1, Config.COMMON.calamityPerWaveMin.get());
+        int max = Math.max(min, Config.COMMON.calamityPerWaveMax.get());
+        int amount = min + level.random.nextInt(max - min + 1);
+        for (int i = 0; i < amount; i++) {
+            String id = data.nextCalamity(new java.util.Random(level.random.nextLong()));
+            if (id == null) return;
+            spawnFromPool(level, data, List.of(id), 1, false);
+        }
+        // 护卫：随难度增加
+        BattleDifficulty difficulty = new BattleDifficulty(level, data.getBeaconPos());
+        int escorts = Math.min(6, Math.max(0, (int) ((difficulty.getFinalDifficulty() - 1) * 0.75)));
+        if (escorts > 0) {
+            spawnFromPool(level, data, sanitize(SporeEntityHelper.getMediumPool()), escorts, false);
+        }
+        data.addSpawned(amount);
+    }
+
+    /**
+     * 从池中生成指定数量的怪。
+     *
+     * @param flying true = 空中生成（飞行生物）
+     */
+    private void spawnFromPool(ServerLevel level, BattleData data, List<String> pool, int count, boolean flying) {
+        if (count <= 0 || pool.isEmpty()) return;
+        List<String> organoids = new ArrayList<>(SporeEntityHelper.organoidSet());
         Random rand = new Random();
 
         for (int i = 0; i < count; i++) {
-            double angle = rand.nextDouble() * 2 * Math.PI;
-            int distance = SPAWN_MIN_DIST + rand.nextInt(SPAWN_MAX_DIST - SPAWN_MIN_DIST + 1);
-
-            int x = center.getX() + (int) (Math.cos(angle) * distance);
-            int z = center.getZ() + (int) (Math.sin(angle) * distance);
-
-            int y = center.getY() + 1;
-
-            boolean found = false;
-            for (int offset = 0; offset >= -10; offset--) {
-                BlockPos checkPos = new BlockPos(x, y + offset, z);
-                if (level.getBlockState(checkPos.below()).isSolid() &&
-                        level.getBlockState(checkPos).isAir() &&
-                        !level.getBlockState(checkPos.above()).isSolid()) {
-                    y = y + offset;
-                    found = true;
+            String entityName = null;
+            for (int attempt = 0; attempt < 8; attempt++) {
+                String candidate = pool.get(rand.nextInt(pool.size()));
+                if (!organoids.contains(candidate)) {
+                    entityName = candidate;
                     break;
                 }
             }
+            if (entityName == null) entityName = pool.get(rand.nextInt(pool.size()));
 
-            if (!found) {
-                for (int offset = 1; offset <= 5; offset++) {
-                    BlockPos checkPos = new BlockPos(x, y + offset, z);
-                    if (level.getBlockState(checkPos.below()).isSolid() &&
-                            level.getBlockState(checkPos).isAir() &&
-                            !level.getBlockState(checkPos.above()).isSolid()) {
-                        y = y + offset;
-                        found = true;
-                        break;
-                    }
+            ResourceLocation id = ResourceLocation.tryParse(entityName);
+            if (id == null) continue;
+            EntityType<?> type = BuiltInRegistries.ENTITY_TYPE.get(id);
+            if (type == null) continue;
+
+            BlockPos pos = flying
+                    ? BattleSpawnPlanner.air(level, data.getSpawnPlan(), level.random)
+                    : BattleSpawnPlanner.ground(level, data.getSpawnPlan(), level.random);
+            if (pos == null) {
+                SporeSRP.LOGGER.warn("Battle: no spawn anchor available, wave partially skipped");
+                return;
+            }
+
+            LivingEntity entity = SporeSpawnHelper.spawnFinalized(level, type, pos);
+            if (!(entity instanceof Mob mob)) continue;
+
+            Player target = null;
+            double nearestDistSq = Double.MAX_VALUE;
+            for (ServerPlayer player : level.getPlayers(p -> true)) {
+                if (player.isSpectator()) continue;
+                double distSq = player.distanceToSqr(entity);
+                if (distSq < nearestDistSq && distSq <= 80 * 80) {
+                    nearestDistSq = distSq;
+                    target = player;
                 }
             }
-
-            if (!found || y <= level.getMinBuildHeight()) {
-                SporeSRP.LOGGER.warn("Failed to find valid spawn position at ({}, {}, {}), skipping", x, y, z);
-                continue;
-            }
-
-            BlockPos spawnPos = new BlockPos(x, y, z);
-
-            String entityName = pool.get(rand.nextInt(pool.size()));
-            EntityType<?> type = BuiltInRegistries.ENTITY_TYPE.get(new ResourceLocation(entityName));
-            if (type == null) {
-                SporeSRP.LOGGER.warn("Entity type '{}' not found, skipping", entityName);
-                continue;
-            }
-
-            LivingEntity entity = (LivingEntity) type.create(level);
-            if (entity == null) continue;
-
-            entity.setPos(spawnPos.getX() + 0.5, spawnPos.getY(), spawnPos.getZ() + 0.5);
-            entity.refreshDimensions();
-            if (entity instanceof Mob battleMob) {
-                SporeSpawnHelper.finalizeBeforeAdd(battleMob);
-            }
-            level.addFreshEntity(entity);
-
-            if (entity instanceof Mob mob) {
-                Player target = null;
-                double nearestDistSq = Double.MAX_VALUE;
-
-                for (ServerPlayer player : level.getPlayers(p -> true)) {
-                    if (player.isSpectator()) continue;
-                    double distSq = player.distanceToSqr(entity);
-                    if (distSq < nearestDistSq && distSq <= 80 * 80) {
-                        nearestDistSq = distSq;
-                        target = player;
-                    }
-                }
-
-                if (target != null) {
-                    mob.setTarget(target);
-                    mob.getNavigation().moveTo(target, 1.5);
-                    mob.setPersistenceRequired();
-                    mob.setAggressive(true);
-                } else {
-                    mob.getNavigation().moveTo(center.getX(), center.getY(), center.getZ(), 1.2);
-                }
+            mob.setPersistenceRequired();
+            if (target != null) {
+                mob.setTarget(target);
+                mob.getNavigation().moveTo(target, 1.5);
+                mob.setAggressive(true);
             }
         }
     }
 
-    // ==================== 获取怪物池 ====================
+    /** 剔除未注册/类器官。 */
+    private List<String> sanitize(List<String> raw) {
+        List<String> out = new ArrayList<>();
+        Set<String> organoids = SporeEntityHelper.organoidSet();
+        for (String id : raw) {
+            if (id == null || id.isBlank()) continue;
+            if (organoids.contains(id)) continue;
+            ResourceLocation rl = ResourceLocation.tryParse(id);
+            if (rl == null || BuiltInRegistries.ENTITY_TYPE.get(rl) == null) continue;
+            out.add(id);
+        }
+        return out;
+    }
 
-    private List<String> getPoolForPhase(BattlePhase phase) {
-        List<String> organoids = new ArrayList<>(SporeEntityHelper.getOrganoids());
-        List<String> pool = new ArrayList<>();
+    // ==================== 阶段入场 ====================
+
+    /** 阶段进入时执行一次：菌囊环 / 灾厄轮转初始化 / 重算锚点。 */
+    private void onPhaseEnter(ServerLevel level, BattleData data) {
+        BattlePhase phase = data.getCurrentPhase();
+        data.setLastMinute(-1);
+        data.setSpawnPlan(BattleSpawnPlanner.prepare(level, data.getBeaconPos(), data.getCorePos()));
 
         switch (phase) {
-            case PHASE_1:
-                pool.addAll(SporeEntityHelper.getSmallPool());
-                pool.addAll(SporeEntityHelper.getMediumPool());
-                break;
-            case PHASE_2:
-                pool.addAll(SporeEntityHelper.getLargePool());
-                pool.addAll(SporeEntityHelper.getBossPool());
-                break;
-            case PHASE_3:
-                pool.addAll(SporeEntityHelper.getMediumPool());
-                pool.addAll(SporeEntityHelper.getLargePool());
-                break;
-            case PHASE_4:
-                pool.addAll(SporeEntityHelper.getBossPool());
-                pool.addAll(SporeEntityHelper.getLargePool());
-                break;
-            default:
-                return pool;
-        }
-
-        pool.removeAll(organoids);
-
-        if (pool.isEmpty()) {
-            SporeSRP.LOGGER.warn("Pool is empty for phase {}, using fallback pool", phase.name());
-            switch (phase) {
-                case PHASE_1: pool.addAll(FALLBACK_POOL_PHASE1); break;
-                case PHASE_2: pool.addAll(FALLBACK_POOL_PHASE2); break;
-                case PHASE_3: pool.addAll(FALLBACK_POOL_PHASE3); break;
-                case PHASE_4: pool.addAll(FALLBACK_POOL_PHASE4); break;
-                default: pool.addAll(FALLBACK_POOL_PHASE1);
+            case PHASE_1 -> spawnMoundRing(level, data);
+            case PHASE_4 -> {
+                List<String> bosses = sanitize(SporeEntityHelper.getBossPool());
+                data.getCalamityOrder().clear();
+                data.getCalamityOrder().addAll(bosses);
+                data.setCalamityIndex(0);
+                java.util.Collections.shuffle(data.getCalamityOrder(), new java.util.Random(level.random.nextLong()));
+                SporeSRP.LOGGER.info("Battle phase 4: {} calamities in rotation", bosses.size());
             }
+            default -> { }
         }
-
-        return pool;
     }
 
+    /** 阶段1：场地外圈生成一圈 1 阶菌囊。 */
+    private void spawnMoundRing(ServerLevel level, BattleData data) {
+        int n = Config.COMMON.moundRingCount.get();
+        if (n <= 0) return;
+        ResourceLocation moundId = ResourceLocation.tryParse("spore:mound");
+        EntityType<?> moundType = moundId == null ? null : BuiltInRegistries.ENTITY_TYPE.get(moundId);
+        if (moundType == null) {
+            SporeSRP.LOGGER.warn("Battle: spore:mound not found, mound ring skipped");
+            return;
+        }
+        BlockPos center = data.getBeaconPos();
+        BlockPos core = data.getCorePos();
+        int radius = Config.COMMON.moundRingRadius.get();
+        int minCore = Config.COMMON.spawnMinCoreDistance.get();
+        double minCoreSq = (double) minCore * minCore;
+        int spawned = 0;
+
+        for (int i = 0; i < n; i++) {
+            double angle = Math.PI * 2.0 * i / n;
+            int x = center.getX() + (int) (Math.cos(angle) * radius);
+            int z = center.getZ() + (int) (Math.sin(angle) * radius);
+            BlockPos surface = level.getHeightmapPos(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
+                    new BlockPos(x, 0, z));
+            if (core != null && surface.distSqr(core) < minCoreSq) continue;
+
+            LivingEntity mound = SporeSpawnHelper.spawnFinalized(level, moundType, surface);
+            if (mound == null) continue;
+            SporeBridge.setMoundAge(mound, 1);
+            mound.getPersistentData().putBoolean("sporesrp_battle_mound", true);
+            if (mound instanceof Mob mob) mob.setPersistenceRequired();
+            data.addBattleMoundId(mound.getId());
+            spawned++;
+        }
+        SporeSRP.LOGGER.info("Battle phase 1: spawned {} level-1 mounds in a ring", spawned);
+    }
+
+    // ==================== 战斗高度校验 ====================
+
+    /** 只允许在海平面以上开战；超平坦世界豁免。 */
+    private boolean checkBattleHeight(ServerLevel level, BlockPos beaconPos, BlockPos corePos) {
+        if (isFlatWorld(level)) return true;
+        int configured = Config.COMMON.battleMinY.get();
+        int threshold = configured >= 0 ? configured : level.getSeaLevel();
+        return corePos.getY() >= threshold && beaconPos.getY() >= threshold - 2;
+    }
+
+    private static boolean isFlatWorld(ServerLevel level) {
+        return level.getChunkSource().getGenerator()
+                instanceof net.minecraft.world.level.levelgen.FlatLevelSource;
+    }
     // ==================== 战斗状态显示 ====================
 
     private void sendBattleStatus(ServerLevel level, BattleData data, BlockPos center) {

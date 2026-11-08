@@ -394,9 +394,22 @@ public class MoundLevelSystem {
                 syncLevelFromSpore(uuid, mound);
 
                 // ---- 阶段节点：强制菌囊不低于该阶段的最低等级 ----
-                int phaseFloor = minLevelForPhase(WorldEvolutionData.get(level).getEvolutionPhase());
+                // 必须**同时**改两处，否则会出现「支援按 4 阶、外观/范围按 1 阶」的割裂：
+                //   1) 我方镜像等级（决定支援参数）→ setLevel
+                //   2) Spore 原生 AGE（决定外观尺寸、感染半径、/data 里的 age）→ SporeBridge.setMoundAge
+                int phaseFloor = mound.getPersistentData().getBoolean("sporesrp_battle_mound")
+                        ? 1   // 净化之战生成的菌囊保持 1 阶
+                        : minLevelForPhase(WorldEvolutionData.get(level).getEvolutionPhase());
+                boolean forced = false;
                 if (phaseFloor > getLevel(uuid)) {
                     setLevel(uuid, phaseFloor);
+                    forced = true;
+                }
+                int sporeAge = SporeBridge.getMoundAge(mound);
+                if (sporeAge >= 0 && phaseFloor > sporeAge) {
+                    if (SporeBridge.setMoundAge(mound, phaseFloor)) forced = true;
+                }
+                if (forced) {
                     SporeSRP.LOGGER.debug("Mound {} forced to level {} by phase floor", uuid, phaseFloor);
                 }
                 int levelNum = getLevel(uuid);

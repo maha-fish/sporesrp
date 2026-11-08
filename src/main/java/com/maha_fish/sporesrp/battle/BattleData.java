@@ -1,5 +1,8 @@
 package com.maha_fish.sporesrp.battle;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
@@ -99,6 +102,49 @@ public class BattleData {
 
     // ==================== NBT 序列化 ====================
 
+    // ==================== 战斗扩展状态 ====================
+
+    /** 开战前的天气快照。 */
+    private BattleWeather.Snapshot weatherSnapshot;
+    /** 已应用过天气（避免重复释放）。 */
+    private boolean weatherApplied;
+    /** 本场战斗的刷怪规划（锚点 + 临时平台）。 */
+    private BattleSpawnPlanner.Plan spawnPlan;
+    /** 阶段1 生成的战斗菌囊（用于避免被阶段下限抬级）。 */
+    private final List<Integer> battleMoundIds = new ArrayList<>();
+    /** 阶段4 的灾厄轮转顺序。 */
+    private final List<String> calamityOrder = new ArrayList<>();
+    private int calamityIndex;
+    /** 当前阶段是否已经执行过入场逻辑。 */
+    private boolean phaseEntered;
+    /** 下一次落雷的 tick。 */
+    private long nextLightningTick;
+
+    public BattleWeather.Snapshot getWeatherSnapshot() { return weatherSnapshot; }
+    public void setWeatherSnapshot(BattleWeather.Snapshot snapshot) { this.weatherSnapshot = snapshot; }
+    public boolean isWeatherApplied() { return weatherApplied; }
+    public void setWeatherApplied(boolean applied) { this.weatherApplied = applied; }
+    public BattleSpawnPlanner.Plan getSpawnPlan() { return spawnPlan; }
+    public void setSpawnPlan(BattleSpawnPlanner.Plan plan) { this.spawnPlan = plan; }
+    public List<Integer> getBattleMoundIds() { return battleMoundIds; }
+    public void addBattleMoundId(int id) { battleMoundIds.add(id); }
+    public List<String> getCalamityOrder() { return calamityOrder; }
+    public int getCalamityIndex() { return calamityIndex; }
+    public void setCalamityIndex(int index) { this.calamityIndex = index; }
+    public boolean isPhaseEntered() { return phaseEntered; }
+    public void setPhaseEntered(boolean entered) { this.phaseEntered = entered; }
+    public long getNextLightningTick() { return nextLightningTick; }
+    public void setNextLightningTick(long tick) { this.nextLightningTick = tick; }
+
+    /** 取下一个灾厄（轮转到底后重新打乱循环）。 */
+    public String nextCalamity(java.util.Random random) {
+        if (calamityOrder.isEmpty()) return null;
+        if (calamityIndex >= calamityOrder.size()) {
+            calamityIndex = 0;
+            java.util.Collections.shuffle(calamityOrder, random);
+        }
+        return calamityOrder.get(calamityIndex++);
+    }
     public CompoundTag serializeNBT() {
         CompoundTag tag = new CompoundTag();
         tag.putBoolean("active", active);

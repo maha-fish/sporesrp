@@ -219,6 +219,45 @@ public class Config {
         public final ForgeConfigSpec.BooleanValue enablePurificationBattle;
         public final ForgeConfigSpec.IntValue playerCheckRadius;
 
+        // ---- 净化之战：天气与闪电 ----
+        public final ForgeConfigSpec.BooleanValue battleThunderstorm;
+        public final ForgeConfigSpec.BooleanValue battleLightningEnabled;
+        public final ForgeConfigSpec.IntValue battleLightningIntervalTicks;
+        public final ForgeConfigSpec.IntValue battleLightningRadiusMin;
+        public final ForgeConfigSpec.IntValue battleLightningRadiusMax;
+        public final ForgeConfigSpec.IntValue battleLightningSafeRadius;
+
+        // ---- 净化之战：开启高度 ----
+        public final ForgeConfigSpec.IntValue battleMinY;
+
+        // ---- 净化之战：刷怪锚点 ----
+        public final ForgeConfigSpec.IntValue spawnAnchorCount;
+        public final ForgeConfigSpec.IntValue spawnRingMinRadius;
+        public final ForgeConfigSpec.IntValue spawnRingMaxRadius;
+        public final ForgeConfigSpec.IntValue spawnMinCoreDistance;
+        public final ForgeConfigSpec.IntValue spawnAttemptsPerMob;
+        public final ForgeConfigSpec.IntValue spawnJitter;
+        public final ForgeConfigSpec.IntValue spawnMaxSurfaceDelta;
+        public final ForgeConfigSpec.IntValue spawnRequireAirAbove;
+        public final ForgeConfigSpec.BooleanValue autoPlatformSpawns;
+        public final ForgeConfigSpec.IntValue spawnPadCount;
+        public final ForgeConfigSpec.IntValue spawnPadRadius;
+        public final ForgeConfigSpec.BooleanValue restoreSpawnPads;
+        public final ForgeConfigSpec.ConfigValue<String> spawnPadBlock;
+
+        // ---- 净化之战：阶段1 菌囊环 ----
+        public final ForgeConfigSpec.IntValue moundRingCount;
+        public final ForgeConfigSpec.IntValue moundRingRadius;
+
+        // ---- 净化之战：阶段2 飞行池 ----
+        public final ForgeConfigSpec.ConfigValue<List<? extends String>> phase2FlyingPool;
+        public final ForgeConfigSpec.IntValue phase2HinderburgPerWave;
+
+        // ---- 净化之战：阶段4 灾厄 ----
+        public final ForgeConfigSpec.IntValue calamityWaveIntervalTicks;
+        public final ForgeConfigSpec.IntValue calamityPerWaveMin;
+        public final ForgeConfigSpec.IntValue calamityPerWaveMax;
+
 
 
         public final ForgeConfigSpec.IntValue hudX;
@@ -856,6 +895,72 @@ public class Config {
             playerCheckRadius = builder
                     .comment("玩家守点检测半径（格）")
                     .defineInRange("playerCheckRadius", 10, 1, 100);
+
+            // ---- 天气与闪电 ----
+            battleThunderstorm = builder.comment("战斗期间强制雷雨").define("battleThunderstorm", true);
+            battleLightningEnabled = builder.comment("战斗期间定期落雷").define("battleLightningEnabled", true);
+            battleLightningIntervalTicks = builder.comment("落雷基准间隔（tick）")
+                    .defineInRange("battleLightningIntervalTicks", 200, 40, 2400);
+            battleLightningRadiusMin = builder.comment("落雷环最小半径")
+                    .defineInRange("battleLightningRadiusMin", 8, 2, 64);
+            battleLightningRadiusMax = builder.comment("落雷环最大半径")
+                    .defineInRange("battleLightningRadiusMax", 32, 4, 128);
+            battleLightningSafeRadius = builder.comment("核心/信标安全半径（不落雷）")
+                    .defineInRange("battleLightningSafeRadius", 8, 0, 64);
+
+            // ---- 开启高度 ----
+            battleMinY = builder.comment("开战最低 Y（-1 = 使用维度海平面；超平坦世界不受限）")
+                    .defineInRange("battleMinY", -1, -1, 320);
+
+            // ---- 刷怪锚点 ----
+            spawnAnchorCount = builder.comment("每阶段预计算的地面锚点数")
+                    .defineInRange("spawnAnchorCount", 24, 4, 64);
+            spawnRingMinRadius = builder.comment("刷怪环最小半径")
+                    .defineInRange("spawnRingMinRadius", 22, 8, 64);
+            spawnRingMaxRadius = builder.comment("刷怪环最大半径")
+                    .defineInRange("spawnRingMaxRadius", 40, 10, 128);
+            spawnMinCoreDistance = builder.comment("刷怪点离核心的最小距离")
+                    .defineInRange("spawnMinCoreDistance", 10, 0, 64);
+            spawnAttemptsPerMob = builder.comment("单只怪最多换几个位置")
+                    .defineInRange("spawnAttemptsPerMob", 12, 1, 64);
+            spawnJitter = builder.comment("锚点周围抖动半径（格）")
+                    .defineInRange("spawnJitter", 2, 0, 8);
+            spawnMaxSurfaceDelta = builder.comment("锚点与战斗中心的最大高度差")
+                    .defineInRange("spawnMaxSurfaceDelta", 10, 2, 64);
+            spawnRequireAirAbove = builder.comment("站立所需净空高度")
+                    .defineInRange("spawnRequireAirAbove", 2, 1, 4);
+            autoPlatformSpawns = builder.comment("海上/高空自动搭建刷怪平台")
+                    .define("autoPlatformSpawns", true);
+            spawnPadCount = builder.comment("平台模式下的平台数量")
+                    .defineInRange("spawnPadCount", 12, 1, 64);
+            spawnPadRadius = builder.comment("平台环半径")
+                    .defineInRange("spawnPadRadius", 28, 8, 64);
+            restoreSpawnPads = builder.comment("战后恢复平台原始方块")
+                    .define("restoreSpawnPads", true);
+            spawnPadBlock = builder.comment("平台方块 id")
+                    .define("spawnPadBlock", "minecraft:obsidian");
+
+            // ---- 阶段1 菌囊环 ----
+            moundRingCount = builder.comment("阶段1 开局生成的 1 阶菌囊数量")
+                    .defineInRange("moundRingCount", 8, 0, 32);
+            moundRingRadius = builder.comment("菌囊环半径")
+                    .defineInRange("moundRingRadius", 28, 8, 64);
+
+            // ---- 阶段2 飞行池 ----
+            phase2FlyingPool = builder.comment("阶段2 的飞行生物池")
+                    .defineList("phase2FlyingPool",
+                            List.of("spore:busser", "spore:gargoyl", "spore:scavenger"),
+                            o -> o instanceof String);
+            phase2HinderburgPerWave = builder.comment("阶段2 每波额外生成的灾厄级飞行生物数量")
+                    .defineInRange("phase2HinderburgPerWave", 1, 0, 3);
+
+            // ---- 阶段4 灾厄 ----
+            calamityWaveIntervalTicks = builder.comment("阶段4 每波间隔（tick）")
+                    .defineInRange("calamityWaveIntervalTicks", 400, 40, 2400);
+            calamityPerWaveMin = builder.comment("阶段4 每波最少灾厄数")
+                    .defineInRange("calamityPerWaveMin", 2, 1, 10);
+            calamityPerWaveMax = builder.comment("阶段4 每波最多灾厄数")
+                    .defineInRange("calamityPerWaveMax", 3, 1, 10);
             builder.pop();
 
             builder.push("hud");
@@ -967,8 +1072,8 @@ public class Config {
                             List.of(0.00, 0.00, 0.00, 0.00, 0.05, 0.10, 0.18, 0.28, 0.40, 0.55, 0.75),
                             o -> o instanceof Double);
             sunlightIgnorePhase = builder
-                    .comment("从该阶段起孢子生物可无视阳光生成（白天额外生成），-1 = 关闭")
-                    .defineInRange("sunlightIgnorePhase", 3, -1, 10);
+                    .comment("从该阶段起孢子生物可无视阳光自然生成（感染群系始终无视，不受此限制），-1 = 关闭")
+                    .defineInRange("sunlightIgnorePhase", 2, -1, 10);
 
 
             builder.pop();
