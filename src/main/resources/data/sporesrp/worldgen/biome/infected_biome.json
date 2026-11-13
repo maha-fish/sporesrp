@@ -1,4 +1,4 @@
-﻿{
+{
     "has_precipitation":  false,
     "temperature":  0.8,
     "downfall":  0.0,
@@ -15,224 +15,224 @@
                                      "options":  {
                                                      "type":  "minecraft:crimson_spore"
                                                  },
-                                     "probability":  0.12
+                                     "probability":  0.025
                                  }
                 },
     "spawners":  {
                      "monster":  [
                                      {
                                          "type":  "spore:inf_human",
-                                         "weight":  5,
+                                         "weight":  20,
                                          "minCount":  1,
                                          "maxCount":  2
                                      },
                                      {
                                          "type":  "spore:inf_villager",
-                                         "weight":  5,
+                                         "weight":  20,
                                          "minCount":  1,
                                          "maxCount":  2
                                      },
                                      {
                                          "type":  "spore:inf_pillager",
-                                         "weight":  5,
+                                         "weight":  20,
                                          "minCount":  1,
                                          "maxCount":  2
                                      },
                                      {
                                          "type":  "spore:inf_drowned",
-                                         "weight":  5,
+                                         "weight":  20,
                                          "minCount":  1,
                                          "maxCount":  2
                                      },
                                      {
                                          "type":  "spore:inf_wanderer",
-                                         "weight":  5,
+                                         "weight":  20,
                                          "minCount":  1,
                                          "maxCount":  2
                                      },
                                      {
                                          "type":  "spore:inf_witch",
-                                         "weight":  5,
+                                         "weight":  20,
                                          "minCount":  1,
                                          "maxCount":  2
                                      },
                                      {
                                          "type":  "spore:inf_diseased_villager",
-                                         "weight":  5,
+                                         "weight":  20,
                                          "minCount":  1,
                                          "maxCount":  2
                                      },
                                      {
                                          "type":  "spore:inf_husk",
-                                         "weight":  5,
+                                         "weight":  20,
                                          "minCount":  1,
                                          "maxCount":  2
                                      },
                                      {
                                          "type":  "spore:inf_hazmat",
-                                         "weight":  5,
+                                         "weight":  20,
                                          "minCount":  1,
                                          "maxCount":  2
                                      },
                                      {
                                          "type":  "spore:knight",
-                                         "weight":  3,
+                                         "weight":  10,
                                          "minCount":  1,
-                                         "maxCount":  2
+                                         "maxCount":  1
                                      },
                                      {
                                          "type":  "spore:griefer",
-                                         "weight":  3,
+                                         "weight":  10,
                                          "minCount":  1,
-                                         "maxCount":  2
+                                         "maxCount":  1
                                      },
                                      {
                                          "type":  "spore:braiomil",
-                                         "weight":  3,
+                                         "weight":  10,
                                          "minCount":  1,
-                                         "maxCount":  2
+                                         "maxCount":  1
                                      },
                                      {
                                          "type":  "spore:busser",
-                                         "weight":  3,
+                                         "weight":  10,
                                          "minCount":  1,
-                                         "maxCount":  2
+                                         "maxCount":  1
                                      },
                                      {
                                          "type":  "spore:leaper",
-                                         "weight":  3,
+                                         "weight":  10,
                                          "minCount":  1,
-                                         "maxCount":  2
+                                         "maxCount":  1
                                      },
                                      {
                                          "type":  "spore:slasher",
-                                         "weight":  3,
+                                         "weight":  10,
                                          "minCount":  1,
-                                         "maxCount":  2
+                                         "maxCount":  1
                                      },
                                      {
                                          "type":  "spore:spitter",
-                                         "weight":  3,
+                                         "weight":  10,
                                          "minCount":  1,
-                                         "maxCount":  2
+                                         "maxCount":  1
                                      },
                                      {
                                          "type":  "spore:inf_vindicator",
-                                         "weight":  3,
+                                         "weight":  10,
                                          "minCount":  1,
-                                         "maxCount":  2
+                                         "maxCount":  1
                                      },
                                      {
                                          "type":  "spore:inf_evoker",
-                                         "weight":  3,
+                                         "weight":  10,
                                          "minCount":  1,
-                                         "maxCount":  2
+                                         "maxCount":  1
                                      },
                                      {
                                          "type":  "spore:howler",
-                                         "weight":  3,
+                                         "weight":  10,
                                          "minCount":  1,
-                                         "maxCount":  2
+                                         "maxCount":  1
                                      },
                                      {
                                          "type":  "spore:stalker",
-                                         "weight":  3,
+                                         "weight":  10,
                                          "minCount":  1,
-                                         "maxCount":  2
+                                         "maxCount":  1
                                      },
                                      {
                                          "type":  "spore:brute",
-                                         "weight":  3,
+                                         "weight":  10,
                                          "minCount":  1,
-                                         "maxCount":  2
+                                         "maxCount":  1
                                      },
                                      {
                                          "type":  "spore:thorn",
-                                         "weight":  3,
+                                         "weight":  10,
                                          "minCount":  1,
-                                         "maxCount":  2
+                                         "maxCount":  1
                                      },
                                      {
                                          "type":  "spore:bloater",
-                                         "weight":  3,
+                                         "weight":  10,
                                          "minCount":  1,
-                                         "maxCount":  2
+                                         "maxCount":  1
                                      },
                                      {
                                          "type":  "spore:scavenger",
-                                         "weight":  3,
+                                         "weight":  10,
                                          "minCount":  1,
-                                         "maxCount":  2
+                                         "maxCount":  1
                                      },
                                      {
                                          "type":  "spore:inebriater",
-                                         "weight":  3,
+                                         "weight":  10,
                                          "minCount":  1,
-                                         "maxCount":  2
+                                         "maxCount":  1
                                      },
                                      {
                                          "type":  "spore:mephitic",
-                                         "weight":  3,
+                                         "weight":  10,
                                          "minCount":  1,
-                                         "maxCount":  2
+                                         "maxCount":  1
                                      },
                                      {
                                          "type":  "spore:chemist",
-                                         "weight":  3,
+                                         "weight":  10,
                                          "minCount":  1,
-                                         "maxCount":  2
+                                         "maxCount":  1
                                      },
                                      {
                                          "type":  "spore:naiad",
-                                         "weight":  3,
+                                         "weight":  10,
                                          "minCount":  1,
-                                         "maxCount":  2
+                                         "maxCount":  1
                                      },
                                      {
                                          "type":  "spore:volatile",
-                                         "weight":  3,
+                                         "weight":  10,
                                          "minCount":  1,
-                                         "maxCount":  2
+                                         "maxCount":  1
                                      },
                                      {
                                          "type":  "spore:nuclea",
-                                         "weight":  3,
+                                         "weight":  10,
                                          "minCount":  1,
-                                         "maxCount":  2
+                                         "maxCount":  1
                                      },
                                      {
                                          "type":  "spore:wendigo",
-                                         "weight":  2,
+                                         "weight":  4,
                                          "minCount":  1,
                                          "maxCount":  1
                                      },
                                      {
                                          "type":  "spore:inquisitor",
-                                         "weight":  2,
+                                         "weight":  4,
                                          "minCount":  1,
                                          "maxCount":  1
                                      },
                                      {
                                          "type":  "spore:brot",
-                                         "weight":  2,
+                                         "weight":  4,
                                          "minCount":  1,
                                          "maxCount":  1
                                      },
                                      {
                                          "type":  "spore:ogre",
-                                         "weight":  2,
+                                         "weight":  4,
                                          "minCount":  1,
                                          "maxCount":  1
                                      },
                                      {
                                          "type":  "spore:hevoker",
-                                         "weight":  2,
+                                         "weight":  4,
                                          "minCount":  1,
                                          "maxCount":  1
                                      },
                                      {
                                          "type":  "spore:hvindicator",
-                                         "weight":  2,
+                                         "weight":  4,
                                          "minCount":  1,
                                          "maxCount":  1
                                      },

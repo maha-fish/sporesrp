@@ -119,7 +119,10 @@ public class Config {
         public final ForgeConfigSpec.ConfigValue<List<? extends String>> spawnTiersByPhase;
         public final ForgeConfigSpec.IntValue nonSporeSpawnBlockPhase;
         public final ForgeConfigSpec.ConfigValue<List<? extends Double>> spawnRateByPhase;
-        public final ForgeConfigSpec.ConfigValue<List<? extends Double>> spawnExtraByPhase;
+        public final ForgeConfigSpec.ConfigValue<List<? extends Double>> spawnExtraSmallByPhase;
+        public final ForgeConfigSpec.ConfigValue<List<? extends Double>> spawnExtraMediumByPhase;
+        public final ForgeConfigSpec.ConfigValue<List<? extends Double>> spawnExtraLargeByPhase;
+        public final ForgeConfigSpec.ConfigValue<List<? extends Double>> spawnExtraBossByPhase;
         public final ForgeConfigSpec.IntValue sunlightIgnorePhase;
 
         public final ForgeConfigSpec.ConfigValue<List<? extends String>> moundSupportConfigs; // 各等级支援参数
@@ -949,7 +952,7 @@ public class Config {
             // ---- 阶段2 飞行池 ----
             phase2FlyingPool = builder.comment("阶段2 的飞行生物池")
                     .defineList("phase2FlyingPool",
-                            List.of("spore:busser", "spore:gargoyl", "spore:scavenger"),
+                            List.of("spore:busser", "spore:gargoyle", "spore:scavenger"),
                             o -> o instanceof String);
             phase2HinderburgPerWave = builder.comment("阶段2 每波额外生成的灾厄级飞行生物数量")
                     .defineInRange("phase2HinderburgPerWave", 1, 0, 3);
@@ -1065,11 +1068,21 @@ public class Config {
                     .defineList("spawnRateByPhase",
                             List.of(0.35, 0.40, 0.50, 0.55, 0.60, 0.70, 0.78, 0.85, 0.92, 0.97, 1.00),
                             o -> o instanceof Double);
-            spawnExtraByPhase = builder
-                    .comment("阶段额外追加概率（0..1）：成功天然生成后，再追加生成一只同类的概率",
-                            "高阶段可超过原版密度上限，做出真正的难度曲线")
-                    .defineList("spawnExtraByPhase",
-                            List.of(0.00, 0.00, 0.00, 0.00, 0.05, 0.10, 0.18, 0.28, 0.40, 0.55, 0.75),
+            spawnExtraSmallByPhase = builder
+                    .comment("附加生成：small 池独立概率（索引 = 阶段 0..10）")
+                    .defineList("spawnExtraSmallByPhase", List.of(0.00, 0.00, 0.00, 0.02, 0.04, 0.07, 0.10, 0.13, 0.16, 0.19, 0.22),
+                            o -> o instanceof Double);
+            spawnExtraMediumByPhase = builder
+                    .comment("附加生成：medium 池独立概率（索引 = 阶段 0..10）")
+                    .defineList("spawnExtraMediumByPhase", List.of(0.00, 0.00, 0.00, 0.01, 0.02, 0.04, 0.06, 0.08, 0.11, 0.14, 0.17),
+                            o -> o instanceof Double);
+            spawnExtraLargeByPhase = builder
+                    .comment("附加生成：large 池独立概率（索引 = 阶段 0..10）")
+                    .defineList("spawnExtraLargeByPhase", List.of(0.00, 0.00, 0.00, 0.00, 0.00, 0.01, 0.02, 0.04, 0.06, 0.09, 0.12),
+                            o -> o instanceof Double);
+            spawnExtraBossByPhase = builder
+                    .comment("附加生成：boss 池独立概率（索引 = 阶段 0..10）")
+                    .defineList("spawnExtraBossByPhase", List.of(0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.01, 0.02, 0.03),
                             o -> o instanceof Double);
             sunlightIgnorePhase = builder
                     .comment("从该阶段起孢子生物可无视阳光自然生成（感染群系始终无视，不受此限制），-1 = 关闭")

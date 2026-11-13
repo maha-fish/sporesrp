@@ -693,8 +693,8 @@ public class PurificationBattle {
         data.setLastMinute(currentMinute);
 
         BattleDifficulty difficulty = new BattleDifficulty(level, center);
-        int baseSpawns = 4 + difficulty.getExtraSpawnsPerMinute();
-        int count = Math.min(baseSpawns + difficulty.getExtraSpawnsPerMinute() * currentMinute, 30);
+        int baseSpawns = 6 + difficulty.getExtraSpawnsPerMinute();
+        int count = Math.min(baseSpawns + difficulty.getExtraSpawnsPerMinute() * currentMinute, 40);
         // 难度系数加成：每级 +10%，上限 2.5 倍
         double mult = Math.min(2.5, 1.0 + 0.10 * Math.max(0, difficulty.getFinalDifficulty() - 1));
         count = Math.max(1, (int) Math.round(count * mult));
@@ -755,7 +755,7 @@ public class PurificationBattle {
 
         int hinderburgs = Config.COMMON.phase2HinderburgPerWave.get();
         for (int i = 0; i < hinderburgs; i++) {
-            spawnFromPool(level, data, List.of("spore:hinderburg"), 1, true);
+            spawnFromPool(level, data, List.of("spore:hindenburg"), 1, true);
         }
     }
 
@@ -785,22 +785,18 @@ public class PurificationBattle {
      */
     private void spawnFromPool(ServerLevel level, BattleData data, List<String> pool, int count, boolean flying) {
         if (count <= 0 || pool.isEmpty()) return;
-        List<String> organoids = new ArrayList<>(SporeEntityHelper.organoidSet());
+        // 池在 sanitize() 阶段已剔除类器官体，这里直接取即可
         Random rand = new Random();
 
         for (int i = 0; i < count; i++) {
-            String entityName = null;
-            for (int attempt = 0; attempt < 8; attempt++) {
-                String candidate = pool.get(rand.nextInt(pool.size()));
-                if (!organoids.contains(candidate)) {
-                    entityName = candidate;
-                    break;
-                }
-            }
-            if (entityName == null) entityName = pool.get(rand.nextInt(pool.size()));
+            String entityName = pool.get(rand.nextInt(pool.size()));
 
             ResourceLocation id = ResourceLocation.tryParse(entityName);
             if (id == null) continue;
+            if (!BuiltInRegistries.ENTITY_TYPE.containsKey(id)) {
+                SporeSRP.LOGGER.warn("Battle: unknown entity id '{}' in pool, skipped", entityName);
+                continue;
+            }
             EntityType<?> type = BuiltInRegistries.ENTITY_TYPE.get(id);
             if (type == null) continue;
 
@@ -897,13 +893,13 @@ public class PurificationBattle {
 
             LivingEntity mound = SporeSpawnHelper.spawnFinalized(level, moundType, surface);
             if (mound == null) continue;
-            SporeBridge.setMoundAge(mound, 1);
+            SporeBridge.setMoundAge(mound, 4);
             mound.getPersistentData().putBoolean("sporesrp_battle_mound", true);
             if (mound instanceof Mob mob) mob.setPersistenceRequired();
             data.addBattleMoundId(mound.getId());
             spawned++;
         }
-        SporeSRP.LOGGER.info("Battle phase 1: spawned {} level-1 mounds in a ring", spawned);
+        SporeSRP.LOGGER.info("Battle phase 1: spawned {} level-4 mounds in a ring", spawned);
     }
 
     // ==================== 战斗高度校验 ====================

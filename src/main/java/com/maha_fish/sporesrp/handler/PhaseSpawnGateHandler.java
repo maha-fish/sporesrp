@@ -61,12 +61,12 @@ public final class PhaseSpawnGateHandler {
     @SubscribeEvent
     public static void onFinalizeSpawn(MobSpawnEvent.FinalizeSpawn event) {
         MobSpawnType type = event.getSpawnType();
-        if (type != MobSpawnType.NATURAL && type != MobSpawnType.CHUNK_GENERATION) return;
         if (!(event.getLevel() instanceof ServerLevel level)) return;
+        boolean naturalOnly = type == MobSpawnType.NATURAL || type == MobSpawnType.CHUNK_GENERATION;
+        if (!naturalOnly && !isBlockedExtraType(type)) return;
 
         BlockPos pos = BlockPos.containing(event.getX(), event.getY(), event.getZ());
-
-        // 感染群系：刷怪表独立，本类完全不干预（不限等级、不限密度）
+        // 感染群系：刷怪表独立，本类不干预
         if (isInfectedBiome(level, pos)) return;
 
         int phase = WorldEvolutionData.get(level).getEvolutionPhase();
@@ -90,14 +90,14 @@ public final class PhaseSpawnGateHandler {
                 return;
             }
 
-            // ③ 额外追加：高阶段从「允许等级」里随机抽一只，实现等级提升
-            double extra = byPhase(Config.COMMON.spawnExtraByPhase.get(), phase, 0.0);
-            if (extra > 0.0 && level.random.nextDouble() < extra) {
-                EntityType<?> extraType = randomAllowedType(allowed);
-                if (extraType != null) {
-                    BlockPos extraPos = living.blockPosition();
-                    PENDING_SPAWNS.add(() -> SporeSpawnHelper.spawnFinalized(level, extraType, extraPos));
-                }
+            // ③ 额外追加：每个等级池独立概率，随阶段递增
+            for (SporeTierHelper.Tier extraTier : allowed) {
+                double extra = byPhase(extraRatios(extraTier), phase, 0.0);
+                if (extra <= 0.0 || level.random.nextDouble() >= extra) continue;
+                EntityType<?> extraType = randomTypeOfTier(extraTier);
+                if (extraType == null) continue;
+                BlockPos extraPos = living.blockPosition();
+                PENDING_SPAWNS.add(() -> SporeSpawnHelper.spawnFinalized(level, extraType, extraPos));
             }
             return;
         }
@@ -126,19 +126,70 @@ public final class PhaseSpawnGateHandler {
         MobSpawnType spawnType = event.getSpawnType();
         if (spawnType != MobSpawnType.NATURAL && spawnType != MobSpawnType.CHUNK_GENERATION) return;
 
-        ResourceLocation typeId = BuiltInRegistries.ENTITY_TYPE.getKey(event.getEntityType());
-        if (typeId == null || !"spore".equals(typeId.getNamespace())) return;
-
         if (!(event.getLevel() instanceof ServerLevel level)) return;
+
+        ResourceLocation typeId = BuiltInRegistries.ENTITY_TYPE.getKey(event.getEntityType());
+        if (typeId == null) return;
+        // 阶段10：其它模组的自然生成同样拦截
+        if (!"spore".equals(typeId.getNamespace())) {
+            int blockPhase = Config.COMMON.nonSporeSpawnBlockPhase.get();
+            if (blockPhase > 0 && WorldEvolutionData.get(level).getEvolutionPhase() >= blockPhase) {
+                event.setResult(net.minecraftforge.eventbus.api.Event.Result.DENY);
+            }
+            return;
+        }
         if (level.getDifficulty() == net.minecraft.world.Difficulty.PEACEFUL) return;
 
         BlockPos pos = event.getPos();
-        if (!isInfectedBiome(level, pos)) {
+        boolean inBiome = isInfectedBiome(level, pos);
+        int phase = WorldEvolutionData.get(level).getEvolutionPhase();
+        if (!inBiome) {
             int threshold = Config.COMMON.sunlightIgnorePhase.get();
-            if (threshold < 0) return;
-            if (WorldEvolutionData.get(level).getEvolutionPhase() < threshold) return;
+            if (threshold < 0) {
+                return;
+            }
+            if (phase < threshold) {
+                return;
+            }
         }
         event.setResult(Event.Result.ALLOW);
+    }
+    /**
+     * 第二个光照关卡：{@code ForgeEventFactory.checkSpawnPosition} → {@code MobSpawnEvent.PositionCheck}。
+     *
+     * <p>自然生成会经过两道检查：
+     * <ol>
+     *   <li>{@code SpawnPlacements.checkSpawnRules} —— 由 {@link #onSpawnPlacementCheck} 放行；</li>
+     *   <li>{@code Mob.checkSpawnRules(...) && Mob.checkSpawnObstruction(...)} —— 由本方法放行。</li>
+     * </ol>
+     * 只放行第 1 道时，白天仍然会在第 2 道因为光照被拦下，表现就是「白天只剩不检查光照的灾厄」。
+     */
+    @SubscribeEvent
+    public static void onPositionCheck(net.minecraftforge.event.entity.living.MobSpawnEvent.PositionCheck event) {
+        if (event.getSpawnType() != MobSpawnType.NATURAL
+                && event.getSpawnType() != MobSpawnType.CHUNK_GENERATION) return;
+        if (!(event.getLevel() instanceof ServerLevel level)) return;
+
+        Entity entity = event.getEntity();
+        boolean spore = entity instanceof LivingEntity living && SporeEntityHelper.isSporeEntity(living);
+        if (!spore) {
+            int blockPhase = Config.COMMON.nonSporeSpawnBlockPhase.get();
+            if (blockPhase > 0 && WorldEvolutionData.get(level).getEvolutionPhase() >= blockPhase) {
+                event.setResult(net.minecraftforge.eventbus.api.Event.Result.DENY);
+            }
+            return;
+        }
+        if (level.getDifficulty() == net.minecraft.world.Difficulty.PEACEFUL) return;
+
+        BlockPos pos = entity.blockPosition();
+        boolean inBiome = isInfectedBiome(level, pos);
+        int phase = WorldEvolutionData.get(level).getEvolutionPhase();
+        if (!inBiome) {
+            int threshold = Config.COMMON.sunlightIgnorePhase.get();
+            if (threshold < 0) return;
+            if (phase < threshold) return;
+        }
+        event.setResult(net.minecraftforge.eventbus.api.Event.Result.ALLOW);
     }
     @SubscribeEvent
     public static void onServerTick(TickEvent.ServerTickEvent event) {
@@ -158,6 +209,32 @@ public final class PhaseSpawnGateHandler {
         return level.getBiome(pos).unwrapKey().map(key -> INFECTED_BIOME.equals(key)).orElse(false);
     }
 
+    /** 每个等级池的附加概率表。 */
+    private static List<? extends Double> extraRatios(SporeTierHelper.Tier tier) {
+        return switch (tier) {
+            case SMALL -> Config.COMMON.spawnExtraSmallByPhase.get();
+            case MEDIUM -> Config.COMMON.spawnExtraMediumByPhase.get();
+            case LARGE -> Config.COMMON.spawnExtraLargeByPhase.get();
+            case BOSS -> Config.COMMON.spawnExtraBossByPhase.get();
+        };
+    }
+
+    /** 从指定等级池里随机取一个实体类型。 */
+    private static EntityType<?> randomTypeOfTier(SporeTierHelper.Tier tier) {
+        Set<String> pool = switch (tier) {
+            case SMALL -> SporeEntityHelper.smallPoolSet();
+            case MEDIUM -> SporeEntityHelper.mediumPoolSet();
+            case LARGE -> SporeEntityHelper.largePoolSet();
+            case BOSS -> SporeEntityHelper.bossPoolSet();
+        };
+        if (pool == null || pool.isEmpty()) return null;
+        // 按池过滤：类器官体不参与附加生成
+        List<String> ids = new ArrayList<>(pool);
+        ids.removeIf(SporeEntityHelper.organoidSet()::contains);
+        if (ids.isEmpty()) return null;
+        ResourceLocation id = ResourceLocation.tryParse(ids.get(java.util.concurrent.ThreadLocalRandom.current().nextInt(ids.size())));
+        return id == null ? null : BuiltInRegistries.ENTITY_TYPE.get(id);
+    }
     private static Set<SporeTierHelper.Tier> allowedTiers(int phase) {
         List<? extends String> list = Config.COMMON.spawnTiersByPhase.get();
         if (list == null || list.isEmpty()) return EnumSet.allOf(SporeTierHelper.Tier.class);
@@ -178,31 +255,18 @@ public final class PhaseSpawnGateHandler {
         return result.isEmpty() ? EnumSet.allOf(SporeTierHelper.Tier.class) : result;
     }
 
-    /** 从允许的等级里随机抽一个实体类型（用于「额外追加」）。 */
-    private static EntityType<?> randomAllowedType(Set<SporeTierHelper.Tier> allowed) {
-        List<SporeTierHelper.Tier> tiers = new ArrayList<>(allowed);
-        if (tiers.isEmpty()) return null;
-        SporeTierHelper.Tier tier = tiers.get(RANDOM.nextInt(tiers.size()));
-
-        Set<String> pool;
-        switch (tier) {
-            case SMALL: pool = SporeEntityHelper.smallPoolSet(); break;
-            case MEDIUM: pool = SporeEntityHelper.mediumPoolSet(); break;
-            case LARGE: pool = SporeEntityHelper.largePoolSet(); break;
-            case BOSS: pool = SporeEntityHelper.bossPoolSet(); break;
-            default: return null;
-        }
-        if (pool == null || pool.isEmpty()) return null;
-
-        List<String> ids = new ArrayList<>(pool);
-        ResourceLocation location = ResourceLocation.tryParse(ids.get(RANDOM.nextInt(ids.size())));
-        return location == null ? null : BuiltInRegistries.ENTITY_TYPE.get(location);
-    }
-
     private static double byPhase(List<? extends Double> list, int phase, double fallback) {
         if (list == null || list.isEmpty()) return fallback;
         int index = Math.max(0, Math.min(phase, list.size() - 1));
         Double value = list.get(index);
         return value == null ? fallback : Math.max(0.0, Math.min(1.0, value));
+    }
+
+    /** 非孢子生物在阶段10需要额外拦截的生成来源。 */
+    private static boolean isBlockedExtraType(MobSpawnType type) {
+        return type == MobSpawnType.SPAWNER
+                || type == MobSpawnType.STRUCTURE
+                || type == MobSpawnType.PATROL
+                || type == MobSpawnType.REINFORCEMENT;
     }
 }

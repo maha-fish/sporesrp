@@ -56,13 +56,57 @@ public class WorldEvolutionData extends SavedData {
      * 而显示侧却用 {@code server.getTickCount()}（uptime，重启归零），
      * 两个时钟一减就会得出上百万 tick 的荒谬倒计时。这里彻底统一。
      */
+    /**
+     * 统一的时钟基准：**固定使用主世界 gameTime**。
+     *
+     * <p>历史问题：这里原本用 {@code boundLevel.getGameTime()}，而 {@code get(level)} 每次都会把
+     * {@code boundLevel} 改成"最后调用它的维度"。切维度时冷却结束 tick 是用 A 维度时间算的，
+     * 却拿 B 维度时间去减，导致倒计时算成"已结束"或"超长"。
+     */
     private long nowTick() {
-        if (this.boundLevel != null) return this.boundLevel.getGameTime();
         MinecraftServer server = cachedServer;
         if (server != null) {
             try { return server.overworld().getGameTime(); } catch (Throwable ignored) { }
         }
         return 0L;
+    }
+
+    /** 旧存档冷却自愈标记（只执行一次）。 */
+    private boolean cooldownSanitized;
+
+    /**
+     * 旧存档自愈：清理历史版本因维度时间基准不一致而写坏的冷却值。
+     *
+     * <p>规则：超过「配置里最长的升阶冷却」一律截断；明显过期的归零。
+     * 不改动点数 / 阶段 / 已解锁阶段。
+     */
+    private void sanitizeCooldown() {
+        long now = nowTick();
+        long maxSeconds = 6000L;
+        var cooldowns = Config.COMMON.phaseUpgradeCooldownSeconds.get();
+        if (cooldowns != null) {
+            for (Object value : cooldowns) {
+                if (value instanceof Integer seconds) maxSeconds = Math.max(maxSeconds, seconds);
+            }
+        }
+        long maxTicks = maxSeconds * 20L;
+
+        if (nextUpgradeAvailableTick < 0 || nextUpgradeAvailableTick < now - maxTicks) {
+            if (nextUpgradeAvailableTick > 0) {
+                SporeSRP.LOGGER.warn("检测到过期/异常的升阶冷却，已重置为就绪（旧值 {}）", nextUpgradeAvailableTick);
+            }
+            nextUpgradeAvailableTick = 0;
+            setDirty();
+        } else if (nextUpgradeAvailableTick > now + maxTicks) {
+            long clamped = now + maxTicks;
+            SporeSRP.LOGGER.warn("检测到超长的升阶冷却（旧存档跨维度时间基准），已从 {} 截断为 {} tick",
+                    nextUpgradeAvailableTick, clamped);
+            nextUpgradeAvailableTick = clamped;
+            setDirty();
+        }
+
+        if (pendingCooldownRemaining < 0) pendingCooldownRemaining = 0;
+        if (pendingCooldownRemaining > (int) Math.min(maxTicks, Integer.MAX_VALUE)) pendingCooldownRemaining = (int) Math.min(maxTicks, Integer.MAX_VALUE);
     }
 
     public void adjustPointCooldown(long currentTick, int seconds) {
@@ -544,9 +588,14 @@ public class WorldEvolutionData extends SavedData {
         if (event.phase != TickEvent.Phase.END) return;
         for (ServerLevel level : event.getServer().getAllLevels()) {
             WorldEvolutionData data = WorldEvolutionData.get(level);
+            if (!data.cooldownSanitized) {
+                data.cooldownSanitized = true;
+                data.sanitizeCooldown();
+            }
             long currentTick = level.getServer().getTickCount();
             int oldPhase = data.getEvolutionPhase();
             data.updatePhase(currentTick);
+
             int newPhase = data.getEvolutionPhase();
             if (newPhase != oldPhase) {
                 // 触发阶段变化事件（广播、属性刷新）
