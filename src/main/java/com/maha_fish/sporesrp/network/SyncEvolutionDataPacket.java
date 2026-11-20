@@ -11,16 +11,27 @@ public class SyncEvolutionDataPacket {
     private final int points;
     private final int phase;
     private final String difficulty;
+    private final String difficultyMode;
+    private final String srpDifficulty;
     /** 冷却结束的**绝对世界时间 tick**；0 表示无冷却。 */
     private final long cooldownEndTick;
     private final int currentThreshold;
     private final int nextThreshold;
 
+    /** 兼容旧调用：默认内置模式 + NORMAL。 */
     public SyncEvolutionDataPacket(int points, int phase, DifficultyManager.Difficulty difficulty,
+                                   long cooldownEndTick, int currentThreshold, int nextThreshold) {
+        this(points, phase, difficulty, DifficultyManager.Mode.SPORESRP,
+                DifficultyManager.SrpDifficulty.NORMAL, cooldownEndTick, currentThreshold, nextThreshold);
+    }
+    public SyncEvolutionDataPacket(int points, int phase, DifficultyManager.Difficulty difficulty,
+                                   DifficultyManager.Mode difficultyMode, DifficultyManager.SrpDifficulty srpDifficulty,
                                    long cooldownEndTick, int currentThreshold, int nextThreshold) {
         this.points = points;
         this.phase = phase;
         this.difficulty = difficulty.name();
+        this.difficultyMode = difficultyMode.name();
+        this.srpDifficulty = srpDifficulty.name();
         this.cooldownEndTick = cooldownEndTick;
         this.currentThreshold = currentThreshold;
         this.nextThreshold = nextThreshold;
@@ -30,6 +41,8 @@ public class SyncEvolutionDataPacket {
         this.points = buf.readInt();
         this.phase = buf.readInt();
         this.difficulty = buf.readUtf();
+        this.difficultyMode = buf.readUtf();
+        this.srpDifficulty = buf.readUtf();
         this.cooldownEndTick = buf.readLong();
         this.currentThreshold = buf.readInt();
         this.nextThreshold = buf.readInt();
@@ -39,6 +52,8 @@ public class SyncEvolutionDataPacket {
         buf.writeInt(points);
         buf.writeInt(phase);
         buf.writeUtf(difficulty);
+        buf.writeUtf(difficultyMode);
+        buf.writeUtf(srpDifficulty);
         buf.writeLong(cooldownEndTick);
         buf.writeInt(currentThreshold);
         buf.writeInt(nextThreshold);
@@ -46,8 +61,8 @@ public class SyncEvolutionDataPacket {
 
     public void handle(Supplier<NetworkEvent.Context> ctx) {
         ctx.get().enqueueWork(() -> {
-            ClientDataHolder.setEvolutionData(points, phase, difficulty, cooldownEndTick,
-                    currentThreshold, nextThreshold);
+            ClientDataHolder.setEvolutionData(points, phase, difficulty, difficultyMode, srpDifficulty,
+                    cooldownEndTick, currentThreshold, nextThreshold);
         });
         ctx.get().setPacketHandled(true);
     }
@@ -56,13 +71,20 @@ public class SyncEvolutionDataPacket {
         private static int points = 0;
         private static int phase = 0;
         private static String difficulty = "SIMPLE";
+        private static String difficultyMode = "SPORESRP";
+        private static String srpDifficulty = "NORMAL";
         /** 冷却结束的绝对世界时间 tick；0 表示无冷却。 */
         private static long cooldownEndTick = 0;
         private static int currentThreshold = 0;
         private static int nextThreshold = 800;
         private static boolean hudEnabled = true;
 
+        /** 兼容旧调用的 setEvolutionData（默认内置模式 + NORMAL）。 */
         public static void setEvolutionData(int pts, int ph, String diff, long endTick,
+                                            int currentThr, int nextThr) {
+            setEvolutionData(pts, ph, diff, "SPORESRP", "NORMAL", endTick, currentThr, nextThr);
+        }
+        public static void setEvolutionData(int pts, int ph, String diff, String mode, String srp, long endTick,
                                             int currentThr, int nextThr) {
             // 服务端是唯一权威：直接记录冷却结束的绝对世界时间 tick。
             // 客户端与服务端共用同一个世界时间，因此这里不需要「接收时刻」做基准，
@@ -70,6 +92,8 @@ public class SyncEvolutionDataPacket {
             points = pts;
             phase = ph;
             difficulty = diff;
+            difficultyMode = mode;
+            srpDifficulty = srp;
             currentThreshold = currentThr;
             nextThreshold = nextThr;
             cooldownEndTick = endTick;
@@ -78,6 +102,8 @@ public class SyncEvolutionDataPacket {
         public static int getPoints() { return points; }
         public static int getPhase() { return phase; }
         public static String getDifficulty() { return difficulty; }
+        public static String getDifficultyMode() { return difficultyMode; }
+        public static String getSrpDifficulty() { return srpDifficulty; }
 
         /**
          * 剩余冷却秒数。仅当 HUD 绘制时调用（每帧一次），

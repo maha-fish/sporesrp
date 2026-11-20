@@ -565,6 +565,11 @@ public class PurificationBattle {
                     switchToLoopMusic(level, data);
                     // ★ 设置 240 秒后重播 loop
                     musicLoopTickMap.put(key, level.getServer().getTickCount() + 240 * 20L);
+                    // 准备阶段结束：此时才生成一阶段的菌囊环
+                    if (data.getCurrentPhase() == BattlePhase.PHASE_1 && !data.isPhaseEntered()) {
+                        data.setPhaseEntered(true);
+                        spawnMoundRing(level, data);
+                    }
                 }
 
                 continue;
@@ -853,7 +858,7 @@ public class PurificationBattle {
         data.setSpawnPlan(BattleSpawnPlanner.prepare(level, data.getBeaconPos(), data.getCorePos()));
 
         switch (phase) {
-            case PHASE_1 -> spawnMoundRing(level, data);
+            case PHASE_1 -> { }   // 菌囊环改到「准备阶段结束」后再生成
             case PHASE_4 -> {
                 List<String> bosses = sanitize(SporeEntityHelper.getBossPool());
                 data.getCalamityOrder().clear();

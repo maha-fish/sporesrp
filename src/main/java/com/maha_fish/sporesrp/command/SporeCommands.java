@@ -223,6 +223,26 @@ public class SporeCommands {
                         )
                 )
                 .then(Commands.literal("difficulty")
+                        .then(Commands.literal("sporesrp")
+                                .then(Commands.argument("tier", StringArgumentType.word())
+                                        .suggests((ctx, builder) -> {
+                                            for (DifficultyManager.Difficulty d : DifficultyManager.Difficulty.values()) {
+                                                builder.suggest(d.name().toLowerCase());
+                                            }
+                                            return builder.buildFuture();
+                                        })
+                                        .executes(ctx -> applyDifficultyMode(ctx, DifficultyManager.Mode.SPORESRP,
+                                                StringArgumentType.getString(ctx, "tier")))))
+                        .then(Commands.literal("srp")
+                                .then(Commands.argument("tier", StringArgumentType.word())
+                                        .suggests((ctx, builder) -> {
+                                            for (DifficultyManager.SrpDifficulty d : DifficultyManager.SrpDifficulty.values()) {
+                                                builder.suggest(d.name().toLowerCase());
+                                            }
+                                            return builder.buildFuture();
+                                        })
+                                        .executes(ctx -> applyDifficultyMode(ctx, DifficultyManager.Mode.SRP,
+                                                StringArgumentType.getString(ctx, "tier")))))
                         .then(Commands.argument("mode", StringArgumentType.word())
                                 .suggests((ctx, builder) -> {
                                     for (DifficultyManager.Difficulty d : DifficultyManager.Difficulty.values()) {
@@ -770,4 +790,45 @@ public class SporeCommands {
             e.discard();
         }
     }
-}
+
+    /** 切换难度模式 + 档位，并刷新属性与 HUD。 */
+    private static int applyDifficultyMode(com.mojang.brigadier.context.CommandContext<net.minecraft.commands.CommandSourceStack> ctx,
+                                           DifficultyManager.Mode mode, String tierName) {
+        net.minecraft.commands.CommandSourceStack source = ctx.getSource();
+        if (!(source.getEntity() instanceof ServerPlayer player)) {
+            source.sendFailure(Component.translatable("sporesrp.command.player_only"));
+            return 0;
+        }
+        var level = player.serverLevel();
+        WorldEvolutionData data = WorldEvolutionData.get(level);
+        DifficultyManager.Difficulty oldSpore = data.getDifficulty();
+        DifficultyManager.SrpDifficulty oldSrp = data.getSrpDifficulty();
+        DifficultyManager.Mode oldMode = data.getDifficultyMode();
+
+        if (mode == DifficultyManager.Mode.SRP) {
+            DifficultyManager.SrpDifficulty target = DifficultyManager.SrpDifficulty.fromName(tierName);
+            if (target == null) {
+                source.sendFailure(Component.translatable("sporesrp.command.difficulty.invalid", tierName));
+                return 0;
+            }
+            data.setDifficultyMode(DifficultyManager.Mode.SRP);
+            data.setSrpDifficulty(target);
+        } else {
+            DifficultyManager.Difficulty target = DifficultyManager.Difficulty.fromName(tierName);
+            if (target == null) {
+                source.sendFailure(Component.translatable("sporesrp.command.difficulty.invalid", tierName));
+                return 0;
+            }
+            data.setDifficultyMode(DifficultyManager.Mode.SPORESRP);
+            data.setDifficulty(target);
+        }
+        data.syncToClients(level);
+        PhaseEffects.refreshAllInfectedAttributes(level);
+        source.sendSuccess(() -> Component.translatable("sporesrp.command.difficulty.success",
+                oldMode.name() + "/" + (oldMode == DifficultyManager.Mode.SRP ? oldSrp.name() : oldSpore.name()),
+                data.getDifficultyMode().name() + "/" + (data.getDifficultyMode() == DifficultyManager.Mode.SRP
+                        ? data.getSrpDifficulty().name() : data.getDifficulty().name())), true);
+        SporeSRP.LOGGER.info("Difficulty mode changed to {}/{} by {}", mode, tierName,
+                player.getName().getString());
+        return 1;
+    }}
