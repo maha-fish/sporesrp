@@ -241,41 +241,6 @@ public class SporeCommands {
                                         })
                                         .executes(ctx -> applyDifficultyMode(ctx, DifficultyManager.Mode.SRP,
                                                 StringArgumentType.getString(ctx, "tier")))))
-                        .then(Commands.argument("mode", StringArgumentType.word())
-                                .suggests((ctx, builder) -> {
-                                    for (DifficultyManager.Difficulty d : DifficultyManager.Difficulty.values()) {
-                                        builder.suggest(d.name().toLowerCase());
-                                    }
-                                    return builder.buildFuture();
-                                })
-                                .executes(ctx -> {
-                                    String modeName = StringArgumentType.getString(ctx, "mode");
-                                    CommandSourceStack source = ctx.getSource();
-                                    if (!(source.getEntity() instanceof ServerPlayer player)) {
-                                        source.sendFailure(Component.translatable("sporesrp.command.player_only"));
-                                        return 0;
-                                    }
-                                    DifficultyManager.Difficulty target = DifficultyManager.Difficulty.fromName(modeName);
-                                    if (target == null) {
-                                        source.sendFailure(Component.translatable("sporesrp.command.difficulty.invalid", modeName));
-                                        return 0;
-                                    }
-                                    var level = player.serverLevel();
-                                    WorldEvolutionData data = WorldEvolutionData.get(level);
-                                    DifficultyManager.Difficulty old = data.getDifficulty();
-                                    if (old == target) {
-                                        source.sendSuccess(() -> Component.translatable("sporesrp.command.difficulty.already", target.getDisplayName()), false);
-                                        return 1;
-                                    }
-                                    data.setDifficulty(target);
-                                    data.syncToClients(level);
-                                    PhaseEffects.refreshAllInfectedAttributes(level);
-                                    source.sendSuccess(() -> Component.translatable("sporesrp.command.difficulty.success",
-                                            old.getDisplayName(), target.getDisplayName()), true);
-                                    SporeSRP.LOGGER.info("Difficulty changed from {} to {} by {}", old, target, player.getName().getString());
-                                    return 1;
-                                })
-                        )
                 )
                 .then(Commands.literal("mound")
                         .then(Commands.literal("info")

@@ -29,6 +29,7 @@ public class ModCreativeTabs {
                     .displayItems((params, output) -> {
                         output.accept(ModItems.MIND_CORE.get());
                         output.accept(ModItems.WORLD_PURIFICATION_CORE.get());
+                        output.accept(ModItems.FULL_HIVEMIND_SPAWN_EGG.get());
                         for (int tier = DecoyTiers.MIN; tier <= DecoyTiers.MAX; tier++) {
                             output.accept(new ItemStack(ModItems.itemForTier(tier)));
                         }

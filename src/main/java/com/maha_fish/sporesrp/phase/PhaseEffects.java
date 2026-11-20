@@ -227,10 +227,22 @@ public class PhaseEffects {
         double baseKnockback = (knockbackAttr != null) ? knockbackAttr.getBaseValue() : 0.0;
 
         // 计算最终属性值
-        double finalHealth = baseHealth + (baseHealth * (healthMult - 1) * healthScale);
-        double finalAttack = baseAttack + (baseAttack * (attackMult - 1) * attackScale);
+        double finalHealth;
+        double finalAttack;
+        int finalArmor;
+        if (srpMode) {
+            // SRP 模式：难度倍率直接乘基础值（SRP 原生就是「生命 ×4 / ×11」这种整体倍率，
+            // 不能只乘阶段加成 —— 阶段 1 加成是 0，乘上去仍然是 0）
+            finalHealth = baseHealth * healthMult * healthScale;
+            finalAttack = baseAttack * attackMult * attackScale;
+            finalArmor = (int) Math.round((baseArmor + armorBonus) * armorScale);
+        } else {
+            // 内置模式：保持原有「只放大阶段加成」的算法，行为不变
+            finalHealth = baseHealth + (baseHealth * (healthMult - 1) * healthScale);
+            finalAttack = baseAttack + (baseAttack * (attackMult - 1) * attackScale);
+            finalArmor = (int) (baseArmor + (armorBonus * armorScale));
+        }
         double finalSpeed = baseSpeed + (speedBonus * diffMultiplier);
-        int finalArmor = (int) (baseArmor + (armorBonus * armorScale));
         double finalKnockback = baseKnockback + (knockbackResist * diffMultiplier);
         if (srpMode) {
             finalKnockback = Math.max(finalKnockback, baseKnockback + difficultyProfile.knockbackResistance());

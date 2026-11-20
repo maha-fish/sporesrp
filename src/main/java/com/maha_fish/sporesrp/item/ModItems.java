@@ -44,6 +44,9 @@ public class ModItems {
                     () -> new BlockItem(ModBlocks.WORLD_PURIFICATION_CORE.get(),
                             new Item.Properties().stacksTo(64)));
 
+    public static final Supplier<Item> FULL_HIVEMIND_SPAWN_EGG =
+            ITEMS.register("full_hivemind_spawn_egg", () -> new FullHivemindSpawnEggItem(new Item.Properties().stacksTo(16)));
+
     public static void register(IEventBus modEventBus) {
         ITEMS.register(modEventBus);
     }
