@@ -27,6 +27,10 @@ public class WorldEvolutionData extends SavedData {
     private int evolutionPhase = 0;
     private long nextUpgradeAvailableTick = 0;
     private DifficultyManager.Difficulty difficulty = DifficultyManager.Difficulty.SIMPLE;
+    /** 难度模式：0=内置, 1=SRP 原生。旧存档缺省为内置。 */
+    private DifficultyManager.Mode difficultyMode = DifficultyManager.Mode.SPORESRP;
+    /** SRP 模式下的档位。 */
+    private DifficultyManager.SrpDifficulty srpDifficulty = DifficultyManager.SrpDifficulty.NORMAL;
     private final Set<Integer> unlockedPhases = new HashSet<>();
     private int pendingCooldownRemaining = -1;
     private boolean purified = false;
@@ -150,6 +154,25 @@ public class WorldEvolutionData extends SavedData {
     public long getNextUpgradeAvailableTick() { return nextUpgradeAvailableTick; }
     public DifficultyManager.Difficulty getDifficulty() { return difficulty; }
 
+    public DifficultyManager.Mode getDifficultyMode() { return difficultyMode; }
+
+    public void setDifficultyMode(DifficultyManager.Mode mode) {
+        this.difficultyMode = mode == null ? DifficultyManager.Mode.SPORESRP : mode;
+        setDirty();
+    }
+
+    public DifficultyManager.SrpDifficulty getSrpDifficulty() { return srpDifficulty; }
+
+    public void setSrpDifficulty(DifficultyManager.SrpDifficulty srpDifficulty) {
+        this.srpDifficulty = srpDifficulty == null ? DifficultyManager.SrpDifficulty.NORMAL : srpDifficulty;
+        setDirty();
+    }
+
+    /** 当前难度档案（模式 + 档位 → 统一倍率入口）。 */
+    public DifficultyManager.Profile getDifficultyProfile() {
+        return new DifficultyManager.Profile(difficultyMode, difficulty, srpDifficulty);
+    }
+
     public void setDifficulty(DifficultyManager.Difficulty difficulty) {
         this.difficulty = difficulty;
         setDirty();
@@ -238,6 +261,10 @@ public class WorldEvolutionData extends SavedData {
     }
 
     public void addEvolutionPoints(int amount, long currentTick) {
+        // 难度模式影响点数获取（SRP: 0.5 / 1 / 1.5 / 10）
+        if (amount > 0) {
+            amount = (int) Math.round(amount * getDifficultyProfile().pointMultiplier());
+        }
         if (purified) return;
         if (amount == 0) return;
         // 正数：受诱饵的「点数冷却」限制
@@ -369,6 +396,8 @@ public class WorldEvolutionData extends SavedData {
         tag.putInt("evolutionPhase", evolutionPhase);
         tag.putLong("nextUpgradeTick", nextUpgradeAvailableTick);
         tag.putInt("difficulty", difficulty.ordinal());
+        tag.putInt("difficultyMode", difficultyMode.ordinal());
+        tag.putInt("srpDifficulty", srpDifficulty.ordinal());
         tag.putString("fullHivemindUuid", fullHivemindUuid);
         tag.putDouble("assaultValue", assaultValue);
         tag.putLong("lastAssaultIncrementTick", lastAssaultIncrementTick);
@@ -399,6 +428,8 @@ public class WorldEvolutionData extends SavedData {
         data.evolutionPhase = tag.getInt("evolutionPhase");
         data.nextUpgradeAvailableTick = tag.getLong("nextUpgradeTick");
         data.difficulty = DifficultyManager.Difficulty.fromOrdinal(tag.getInt("difficulty"));
+        data.difficultyMode = DifficultyManager.Mode.fromOrdinal(tag.getInt("difficultyMode"));
+        data.srpDifficulty = DifficultyManager.SrpDifficulty.fromOrdinal(tag.getInt("srpDifficulty"));
         data.fullHivemindUuid = tag.getString("fullHivemindUuid");
         data.assaultValue = tag.getDouble("assaultValue");
         data.lastAssaultIncrementTick = tag.getLong("lastAssaultIncrementTick");

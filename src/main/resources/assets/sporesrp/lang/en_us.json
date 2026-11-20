@@ -1,4 +1,5 @@
 {
+  "sporesrp.difficulty.mode.sporesrp": "Built-in", "sporesrp.difficulty.mode.srp": "SRP", "sporesrp.difficulty.sporesrp.simple": "Simple", "sporesrp.difficulty.sporesrp.normal": "Normal", "sporesrp.difficulty.sporesrp.hard": "Hard", "sporesrp.difficulty.sporesrp.nightmare": "Nightmare", "sporesrp.difficulty.srp.easy": "Easy", "sporesrp.difficulty.srp.normal": "Normal", "sporesrp.difficulty.srp.hard": "Hard", "sporesrp.difficulty.srp.impossible": "Impossible",
     "sporesrp.command.player_only":  "This command can only be executed by a player.",
     "sporesrp.sleep.prevent":  "The world is deeply corrupted, you cannot sleep peacefully!",
     "sporesrp.phase.0":  "§cThe land remains silent... for now.",
@@ -67,7 +68,7 @@
     "block.sporesrp.world_purification_core":  "World Purification Core",
     "sporesrp.hud.cooldown.ready":  "Ready",
     "sporesrp.hud.cooldown":  "Cooldown: %ds",
-    "sporesrp.hud.difficulty":  "Difficulty: %s",
+    "sporesrp.hud.difficulty": "[%s]%s",
     "sporesrp.battle.start":  "§6§lWorld Purification Battle begins! Protect the Beacon and Core!",
     "sporesrp.battle.phase":  "§6§lEntering Phase: %s",
     "sporesrp.battle.victory":  "§6§lWorld Purified!",

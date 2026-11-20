@@ -205,6 +205,11 @@ public class FullHivemindHandler {
     }
 
     public static void applyFullHivemindAttributes(LivingEntity entity, ServerLevel level) {
+        // 完整心智成型：恐怖感音效 —— 监守者破土（低频压迫）+ 远古守卫者诅咒
+        level.playSound(null, entity.blockPosition(), net.minecraft.sounds.SoundEvents.WARDEN_EMERGE,
+                net.minecraft.sounds.SoundSource.HOSTILE, 1.6F, 0.62F);
+        level.playSound(null, entity.blockPosition(), net.minecraft.sounds.SoundEvents.ELDER_GUARDIAN_CURSE,
+                net.minecraft.sounds.SoundSource.HOSTILE, 1.3F, 0.5F);
         if (entity == null) return;
         double healthMultiplier = Config.COMMON.fullHivemindHealthMultiplier.get();
         int armorBonus = Config.COMMON.fullHivemindArmorBonus.get();

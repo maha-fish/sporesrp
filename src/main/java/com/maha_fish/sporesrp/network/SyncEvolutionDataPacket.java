@@ -68,13 +68,20 @@ public record SyncEvolutionDataPacket(
         private static int points = 0;
         private static int phase = 0;
         private static String difficulty = "SIMPLE";
+        private static String difficultyMode = "SPORESRP";
+        private static String srpDifficulty = "NORMAL";
         /** 冷却结束的绝对世界时间 tick；0 表示无冷却。 */
         private static long cooldownEndTick = 0;
         private static int currentThreshold = 0;
         private static int nextThreshold = 800;
         private static boolean hudEnabled = true;
 
+        /** 兼容旧调用的 setEvolutionData（默认内置模式 + NORMAL）。 */
         public static void setEvolutionData(int pts, int ph, String diff, long endTick,
+                                            int currentThr, int nextThr) {
+            setEvolutionData(pts, ph, diff, "SPORESRP", "NORMAL", endTick, currentThr, nextThr);
+        }
+        public static void setEvolutionData(int pts, int ph, String diff, String mode, String srp, long endTick,
                                             int currentThr, int nextThr) {
             // 服务端是唯一权威：直接记录冷却结束的绝对世界时间 tick。
             // 客户端与服务端共用同一个世界时间，因此这里不需要「接收时刻」做基准，
@@ -82,6 +89,8 @@ public record SyncEvolutionDataPacket(
             points = pts;
             phase = ph;
             difficulty = diff;
+            difficultyMode = mode;
+            srpDifficulty = srp;
             currentThreshold = currentThr;
             nextThreshold = nextThr;
             cooldownEndTick = endTick;
@@ -90,6 +99,8 @@ public record SyncEvolutionDataPacket(
         public static int getPoints() { return points; }
         public static int getPhase() { return phase; }
         public static String getDifficulty() { return difficulty; }
+        public static String getDifficultyMode() { return difficultyMode; }
+        public static String getSrpDifficulty() { return srpDifficulty; }
 
         /**
          * 剩余冷却秒数。仅当 HUD 绘制时调用（每帧一次），

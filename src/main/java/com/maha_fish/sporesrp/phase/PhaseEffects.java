@@ -1,5 +1,7 @@
 package com.maha_fish.sporesrp.phase;
 
+import com.maha_fish.sporesrp.data.DifficultyManager;
+
 import com.maha_fish.sporesrp.Config;
 import com.maha_fish.sporesrp.SporeSRP;
 import com.maha_fish.sporesrp.data.WorldEvolutionData;
@@ -57,6 +59,15 @@ public class PhaseEffects {
 
         level.getServer().getPlayerList().broadcastSystemMessage(upgradeMsg, false);
         level.getServer().getPlayerList().broadcastSystemMessage(atmosphere, false);
+
+        // 阶段提升：恐怖感音效 —— 幽匿尖啸（短促惊悚）+ 远古守卫者诅咒（低沉不祥）
+        float pitch = 0.85F + Math.min(newPhase, 10) * 0.03F;
+        for (ServerPlayer player : level.getServer().getPlayerList().getPlayers()) {
+            player.playNotifySound(net.minecraft.sounds.SoundEvents.SCULK_SHRIEKER_SHRIEK,
+                    net.minecraft.sounds.SoundSource.AMBIENT, 1.2F, pitch);
+            player.playNotifySound(net.minecraft.sounds.SoundEvents.ELDER_GUARDIAN_CURSE,
+                    net.minecraft.sounds.SoundSource.AMBIENT, 0.8F, pitch * 0.8F);
+        }
 
         refreshAllLevels(level.getServer());
 
@@ -144,6 +155,7 @@ public class PhaseEffects {
         WorldEvolutionData data = WorldEvolutionData.get(level);
         int phase = data.getEvolutionPhase();
         double diffMultiplier = data.getDifficulty().getMultiplier();
+        DifficultyManager.Profile difficultyProfile = data.getDifficultyProfile();
 
         double healthMult = (Double) Config.COMMON.healthMultipliers.get().get(phase);
         double attackMult = (Double) Config.COMMON.attackMultipliers.get().get(phase);
@@ -157,7 +169,7 @@ public class PhaseEffects {
             if (entity instanceof LivingEntity living && SporeEntityHelper.isSporeEntity(living)) {
                 sporeCount++;
                 applyAttributesDirect(living, healthMult, attackMult, speedBonus,
-                        armorBonus, knockbackResist, diffMultiplier, true);
+                armorBonus, knockbackResist, diffMultiplier, difficultyProfile, true);
             }
         }
 
@@ -171,6 +183,7 @@ public class PhaseEffects {
         WorldEvolutionData data = WorldEvolutionData.get(level);
         int phase = data.getEvolutionPhase();
         double diffMultiplier = data.getDifficulty().getMultiplier();
+        DifficultyManager.Profile difficultyProfile = data.getDifficultyProfile();
 
         double healthMult = (Double) Config.COMMON.healthMultipliers.get().get(phase);
         double attackMult = (Double) Config.COMMON.attackMultipliers.get().get(phase);
@@ -179,7 +192,7 @@ public class PhaseEffects {
         double knockbackResist = (Double) Config.COMMON.knockbackResist.get().get(phase);
 
         applyAttributesDirect(entity, healthMult, attackMult, speedBonus,
-                armorBonus, knockbackResist, diffMultiplier, false);
+                armorBonus, knockbackResist, diffMultiplier, difficultyProfile, false);
     }
 
     // ========== 核心：属性应用 ==========
@@ -190,7 +203,13 @@ public class PhaseEffects {
                                               int armorBonus,
                                               double knockbackResist,
                                               double diffMultiplier,
+                                              DifficultyManager.Profile difficultyProfile,
                                               boolean preserveHealthPercent) {
+        // SRP 模式：生命/伤害/护甲使用 SRP 原生倍率；内置模式沿用单倍率（行为不变）
+        boolean srpMode = difficultyProfile != null && difficultyProfile.isSrp();
+        double healthScale = srpMode ? difficultyProfile.healthMultiplier() : diffMultiplier;
+        double attackScale = srpMode ? difficultyProfile.damageMultiplier() : diffMultiplier;
+        double armorScale  = srpMode ? difficultyProfile.armorMultiplier()  : diffMultiplier;
         // 获取实体的基础属性值（通过 AttributeInstance，若不存在则使用默认值）
         AttributeInstance healthAttr = entity.getAttribute(Attributes.MAX_HEALTH);
         double baseHealth = (healthAttr != null) ? healthAttr.getBaseValue() : 20.0;
@@ -208,11 +227,14 @@ public class PhaseEffects {
         double baseKnockback = (knockbackAttr != null) ? knockbackAttr.getBaseValue() : 0.0;
 
         // 计算最终属性值
-        double finalHealth = baseHealth + (baseHealth * (healthMult - 1) * diffMultiplier);
-        double finalAttack = baseAttack + (baseAttack * (attackMult - 1) * diffMultiplier);
+        double finalHealth = baseHealth + (baseHealth * (healthMult - 1) * healthScale);
+        double finalAttack = baseAttack + (baseAttack * (attackMult - 1) * attackScale);
         double finalSpeed = baseSpeed + (speedBonus * diffMultiplier);
-        int finalArmor = (int) (baseArmor + (armorBonus * diffMultiplier));
+        int finalArmor = (int) (baseArmor + (armorBonus * armorScale));
         double finalKnockback = baseKnockback + (knockbackResist * diffMultiplier);
+        if (srpMode) {
+            finalKnockback = Math.max(finalKnockback, baseKnockback + difficultyProfile.knockbackResistance());
+        }
 
         // ---- 生命值 ----
         if (healthAttr != null) {
@@ -308,7 +330,8 @@ public class PhaseEffects {
         int phase = data.getEvolutionPhase();
         List<? extends Double> multipliers = Config.COMMON.attackMultipliers.get();
         double phaseMultiplier = (phase < multipliers.size()) ? multipliers.get(phase) : 1.0;
-        double diffMultiplier = data.getDifficulty().getMultiplier();
+        // 难度倍率：内置模式 = 单倍率；SRP 模式 = SRP 原生伤害倍率（1/1/4/11）
+        double diffMultiplier = data.getDifficultyProfile().damageMultiplier();
         double finalMultiplier = 1.0 + (phaseMultiplier - 1) * diffMultiplier;
 
         float newAmount = event.getContainer().getNewDamage() * (float) finalMultiplier;
