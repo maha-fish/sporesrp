@@ -38,6 +38,9 @@ public class ModItems {
         return DECOYS[t].get();
     }
 
+    public static final RegistryObject<Item> FULL_HIVEMIND_SPAWN_EGG =
+            ITEMS.register("full_hivemind_spawn_egg", () -> new FullHivemindSpawnEggItem(new Item.Properties().stacksTo(16)));
+
     public static void register(IEventBus modEventBus) {
         ITEMS.register(modEventBus);
     }

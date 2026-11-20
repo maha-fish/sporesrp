@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "sporesrp:item/full_hivemind_spawn_egg"
+  }
+}

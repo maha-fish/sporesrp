@@ -85,19 +85,12 @@ public class HUDOverlay {
         gui.drawString(mc.font, Component.literal(infoText), x - FULL_WIDTH, infoY, 0xAAAAAA);
     }
 
-    /** HUD 难度显示：[模式]难度，例如 [SRP]困难 / [内置]普通。 */
+    /** HUD 难度显示：硬编码大写英文，格式 [模式] 难度，例如 [SRP] HARD / [SPORESRP] NIGHTMARE。 */
     private static String difficultyLabel(String difficulty) {
         String mode = SyncEvolutionDataPacket.ClientDataHolder.getDifficultyMode();
-        String tier = difficulty == null ? "SIMPLE" : difficulty.toLowerCase();
-        String modeKey = "sporesrp.difficulty.mode." + (mode == null ? "sporesrp" : mode.toLowerCase());
-        String tierKey;
-        if ("SRP".equalsIgnoreCase(mode)) {
-            tierKey = "sporesrp.difficulty.srp." + tier;
-        } else {
-            tierKey = "sporesrp.difficulty.sporesrp." + tier;
-        }
-        return Component.translatable("sporesrp.hud.difficulty",
-                Component.translatable(modeKey), Component.translatable(tierKey)).getString();
+        String modeName = (mode == null || mode.isBlank()) ? "SPORESRP" : mode.toUpperCase(java.util.Locale.ROOT);
+        String tierName = (difficulty == null || difficulty.isBlank()) ? "SIMPLE" : difficulty.toUpperCase(java.util.Locale.ROOT);
+        return "[" + modeName + "] " + tierName;
     }
     private static int progressWidth(int phase, int points, int currentThreshold, int nextThreshold) {
         if (phase >= 10) return 80;
